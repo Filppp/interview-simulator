@@ -46,3 +46,31 @@ export interface ApiTestResult {
   ok: boolean
   message: string
 }
+
+/* ---------- 资料库 ---------- */
+
+export type MaterialCategory = 'english' | 'major' | 'resume'
+
+export interface MaterialMeta {
+  id: string
+  /** 原始文件名 */
+  name: string
+  /** 存储的绝对路径 */
+  storedPath: string
+  category: MaterialCategory
+  /** pdf | docx */
+  ext: string
+  sizeBytes: number
+  /** PDF 页数（docx 为 null） */
+  pageCount: number | null
+  charCount: number
+  addedAt: string
+  status: 'ok' | 'error'
+  error?: string
+}
+
+export interface MaterialDetail {
+  meta: MaterialMeta
+  /** 抽取的全文（预览用） */
+  text: string
+}
