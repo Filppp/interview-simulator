@@ -74,3 +74,47 @@ export interface MaterialDetail {
   /** 抽取的全文（预览用） */
   text: string
 }
+
+/* ---------- 语音（M3） ---------- */
+
+export interface AsrStatus {
+  /** 识别引擎（venv + faster-whisper）是否就绪 */
+  engineReady: boolean
+  /** whisper 模型是否已下载完整 */
+  modelReady: boolean
+  modelName: string
+  /** 模型目录 */
+  modelDir: string
+  /** 模型总大小（字节） */
+  modelTotalBytes: number
+  /** 已下载字节 */
+  modelDownloadedBytes: number
+}
+
+export type AsrProgressPhase = 'venv' | 'pip' | 'download' | 'verify'
+
+export interface AsrProgress {
+  phase: AsrProgressPhase
+  message: string
+  /** 下载用：已下载 / 总字节 */
+  done: number
+  total: number
+  /** 瞬时速度 B/s */
+  speedBps: number
+}
+
+export interface TranscribeResult {
+  ok: boolean
+  text: string
+  language: string | null
+  duration: number
+  error?: string
+}
+
+export interface SpeakResult {
+  ok: boolean
+  /** base64 编码的 mp3 */
+  base64: string
+  mime: string
+  error?: string
+}

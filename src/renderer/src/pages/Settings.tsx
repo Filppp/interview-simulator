@@ -1,5 +1,12 @@
-import { useEffect, useState } from 'react'
-import type { AppInfo, InterviewSettings, MicStatus } from '../../../shared/types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type {
+  AppInfo,
+  AsrProgress,
+  AsrStatus,
+  InterviewSettings,
+  MicStatus,
+  TranscribeResult
+} from '../../../shared/types'
 
 const ZH_VOICES = [
   { id: 'zh-CN-XiaoxiaoNeural', label: '晓晓（女声，自然）' },
@@ -23,6 +30,21 @@ const MIC_STATUS_TEXT: Record<MicStatus, { text: string; cls: string }> = {
   unknown: { text: '未知状态', cls: 'warn' }
 }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / 1048576).toFixed(1)} MB`
+}
+
+function arrayBufferToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
 export default function Settings(): React.JSX.Element {
   const [settings, setSettings] = useState<InterviewSettings | null>(null)
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
@@ -31,6 +53,27 @@ export default function Settings(): React.JSX.Element {
   const [savedTip, setSavedTip] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+
+  // 语音识别状态
+  const [asrStatus, setAsrStatus] = useState<AsrStatus | null>(null)
+  const [asrProgress, setAsrProgress] = useState<AsrProgress | null>(null)
+  const [asrBusy, setAsrBusy] = useState<'setup' | 'download' | null>(null)
+  const [asrError, setAsrError] = useState<string | null>(null)
+
+  // TTS 试听
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [ttsError, setTtsError] = useState<string | null>(null)
+
+  // 录音识别测试
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const [transcribeResult, setTranscribeResult] = useState<TranscribeResult | null>(null)
+
+  const loadAsrStatus = useCallback(async (): Promise<void> => {
+    setAsrStatus(await window.api.getAsrStatus())
+  }, [])
 
   useEffect(() => {
     void (async () => {
@@ -43,6 +86,11 @@ export default function Settings(): React.JSX.Element {
       setAppInfo(info)
       setMicStatus(mic)
     })()
+    void loadAsrStatus()
+  }, [loadAsrStatus])
+
+  useEffect(() => {
+    return window.api.onAsrProgress((p) => setAsrProgress(p))
   }, [])
 
   const update = (patch: Partial<InterviewSettings>): void => {
@@ -67,27 +115,118 @@ export default function Settings(): React.JSX.Element {
     setTesting(true)
     setTestResult(null)
     try {
-      const r = await window.api.testApiKey(settings.apiKey)
-      setTestResult(r)
+      setTestResult(await window.api.testApiKey(settings.apiKey))
     } finally {
       setTesting(false)
     }
   }
 
   const handleRequestMic = async (): Promise<void> => {
-    const st = await window.api.requestMic()
-    setMicStatus(st)
+    setMicStatus(await window.api.requestMic())
+  }
+
+  /* ---------- 语音识别 ---------- */
+
+  const handleSetupEngine = async (): Promise<void> => {
+    setAsrBusy('setup')
+    setAsrError(null)
+    setAsrProgress(null)
+    try {
+      setAsrStatus(await window.api.setupAsr())
+    } catch (e) {
+      setAsrError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAsrBusy(null)
+    }
+  }
+
+  const handleDownloadModel = async (): Promise<void> => {
+    setAsrBusy('download')
+    setAsrError(null)
+    setAsrProgress(null)
+    try {
+      setAsrStatus(await window.api.downloadAsrModel())
+    } catch (e) {
+      setAsrError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAsrBusy(null)
+    }
+  }
+
+  const handleCancelDownload = async (): Promise<void> => {
+    await window.api.cancelAsrDownload()
+  }
+
+  /* ---------- TTS 试听 ---------- */
+
+  const handleTtsPreview = async (voice: string, text: string): Promise<void> => {
+    if (!settings) return
+    setTtsError(null)
+    const r = await window.api.speakTts(text, voice, settings.ttsSpeed)
+    if (r.ok && audioRef.current) {
+      audioRef.current.src = `data:${r.mime};base64,${r.base64}`
+      await audioRef.current.play().catch(() => setTtsError('播放失败'))
+    } else {
+      setTtsError(r.error ?? '合成失败')
+    }
+  }
+
+  /* ---------- 录音识别测试 ---------- */
+
+  const startRecording = async (): Promise<void> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      chunksRef.current = []
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        void (async () => {
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+          const buf = new Uint8Array(await blob.arrayBuffer())
+          setTranscribing(true)
+          try {
+            const r = await window.api.transcribeAudio(arrayBufferToBase64(buf))
+            setTranscribeResult(r)
+          } finally {
+            setTranscribing(false)
+          }
+        })()
+      }
+      rec.start()
+      recorderRef.current = rec
+      setRecording(true)
+      setTranscribeResult(null)
+    } catch (e) {
+      setTranscribeResult({
+        ok: false,
+        text: '',
+        language: null,
+        duration: 0,
+        error: `无法录音：${e instanceof Error ? e.message : String(e)}`
+      })
+    }
+  }
+
+  const stopRecording = (): void => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop()
+    }
+    setRecording(false)
   }
 
   if (!settings) return <div className="page-loading">加载中…</div>
 
   const mic = MIC_STATUS_TEXT[micStatus]
-
+  const dlSpeed =
+    asrProgress && asrProgress.speedBps > 0 ? formatBytes(asrProgress.speedBps) + '/s' : ''
   return (
     <div className="page">
       <header className="page-header">
         <h1>设置</h1>
-        <p>配置 API、面试参数与语音选项</p>
+        <p>配置 API、面试参数、语音识别与语音合成</p>
       </header>
 
       <section className="card">
@@ -187,7 +326,7 @@ export default function Settings(): React.JSX.Element {
       </section>
 
       <section className="card">
-        <h2 className="card-title">🔊 语音</h2>
+        <h2 className="card-title">🔊 语音合成（Edge TTS）</h2>
         <label className="checkbox-row">
           <input
             type="checkbox"
@@ -228,7 +367,21 @@ export default function Settings(): React.JSX.Element {
               onChange={(e) => update({ ttsSpeed: Number(e.target.value) })}
             />
           </div>
+          <div className="form-row">
+            <label>试听</label>
+            <div className="inline-actions">
+              <button className="btn" onClick={() => void handleTtsPreview(settings.ttsVoiceZh, '你好，我是模拟面试官，请先做个自我介绍。')}>
+                中文试听
+              </button>
+              <button className="btn" onClick={() => void handleTtsPreview(settings.ttsVoiceEn, "Hello, I'm your interviewer. Could you introduce yourself?")}>
+                英文试听
+              </button>
+              {ttsError && <span className="test-result bad">{ttsError}</span>}
+            </div>
+          </div>
         </div>
+        <p className="hint">使用微软 Edge 在线语音合成，免费、无需 Key；首次合成需联网，之后自动缓存。</p>
+        <audio ref={audioRef} className="hidden-audio" />
       </section>
 
       <section className="card">
@@ -247,7 +400,100 @@ export default function Settings(): React.JSX.Element {
             申请麦克风权限
           </button>
         </div>
-        <p className="hint">语音识别（Whisper）在 M3 里程碑接入，届时麦克风用于录音输入。</p>
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">🧠 语音识别（本地 Whisper）</h2>
+        {asrStatus && (
+          <div className="asr-status">
+            <div className="asr-line">
+              <span className="asr-label">识别引擎</span>
+              {asrStatus.engineReady ? (
+                <span className="ok-text">✅ 已安装（venv + faster-whisper）</span>
+              ) : (
+                <span className="warn-text">❌ 未安装</span>
+              )}
+            </div>
+            <div className="asr-line">
+              <span className="asr-label">语音模型</span>
+              {asrStatus.modelReady ? (
+                <span className="ok-text">✅ {asrStatus.modelName}（{formatBytes(asrStatus.modelTotalBytes)}）</span>
+              ) : (
+                <span className="warn-text">
+                  ⚠️ 未下载完成（{formatBytes(asrStatus.modelDownloadedBytes)} / {formatBytes(asrStatus.modelTotalBytes)}）
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="inline-actions" style={{ marginTop: 12 }}>
+          <button className="btn" onClick={() => void handleSetupEngine()} disabled={asrBusy !== null || asrStatus?.engineReady}>
+            {asrBusy === 'setup' ? '安装中…' : asrStatus?.engineReady ? '引擎已就绪' : '安装识别引擎'}
+          </button>
+          <button
+            className="btn primary"
+            onClick={() => void handleDownloadModel()}
+            disabled={asrBusy !== null || asrStatus?.modelReady}
+          >
+            {asrBusy === 'download' ? '下载中…' : asrStatus?.modelReady ? '模型已就绪' : '下载语音模型'}
+          </button>
+          {asrBusy === 'download' && (
+            <button className="btn danger" onClick={() => void handleCancelDownload()}>
+              取消
+            </button>
+          )}
+        </div>
+
+        {asrProgress && asrProgress.phase === 'download' && (
+          <div className="dl-box">
+            <div className="dl-bar">
+              <div className="dl-fill" style={{ width: `${(asrProgress.done / Math.max(1, asrProgress.total)) * 100}%` }} />
+            </div>
+            <div className="dl-meta">
+              {asrProgress.message}
+              {dlSpeed && <span> · {dlSpeed}</span>}
+            </div>
+          </div>
+        )}
+        {asrProgress && asrProgress.phase !== 'download' && (
+          <div className="dl-meta">{asrProgress.message}</div>
+        )}
+        {asrError && <div className="err-banner">⚠️ {asrError}</div>}
+        <p className="hint">
+          引擎约 100MB（首次安装），模型约 464MB，均只需一次。模型下载支持断点续传；若网络不佳可稍后重试。
+          识别全程在本机运行，音频不会上传。
+        </p>
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">🎙️ 录音识别测试</h2>
+        <div className="inline-actions">
+          <button
+            className={`btn ${recording ? 'danger' : 'primary'}`}
+            onPointerDown={() => void startRecording()}
+            onPointerUp={stopRecording}
+            onPointerLeave={recording ? stopRecording : undefined}
+            disabled={transcribing}
+          >
+            {recording ? '🔴 松开结束' : transcribing ? '识别中…' : '🎤 按住说话'}
+          </button>
+          {transcribeResult && (
+            <div className="transcribe-result">
+              {transcribeResult.ok ? (
+                <>
+                  <div className="ok-text">识别结果（{transcribeResult.language ?? 'auto'}）：</div>
+                  <div className="transcribe-text">{transcribeResult.text || '（未识别到内容）'}</div>
+                </>
+              ) : (
+                <span className="bad-text">{transcribeResult.error}</span>
+              )}
+            </div>
+          )}
+        </div>
+        <p className="hint">
+          按住按钮说一句话松开，测试「录音 → 识别」全链路。需要模型下载完成后才能识别。
+        </p>
       </section>
 
       <section className="card">

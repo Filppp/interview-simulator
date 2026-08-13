@@ -6,7 +6,11 @@ import type {
   ApiTestResult,
   MaterialCategory,
   MaterialDetail,
-  MaterialMeta
+  MaterialMeta,
+  AsrStatus,
+  AsrProgress,
+  TranscribeResult,
+  SpeakResult
 } from '../shared/types'
 
 const api = {
@@ -26,7 +30,23 @@ const api = {
     ipcRenderer.invoke('materials:pickAndAdd', category),
   removeMaterial: (id: string): Promise<void> => ipcRenderer.invoke('materials:remove', id),
   previewMaterial: (id: string): Promise<MaterialDetail | null> =>
-    ipcRenderer.invoke('materials:preview', id)
+    ipcRenderer.invoke('materials:preview', id),
+
+  getAsrStatus: (): Promise<AsrStatus> => ipcRenderer.invoke('asr:status'),
+  setupAsr: (): Promise<AsrStatus> => ipcRenderer.invoke('asr:setup'),
+  downloadAsrModel: (): Promise<AsrStatus> => ipcRenderer.invoke('asr:downloadModel'),
+  cancelAsrDownload: (): Promise<void> => ipcRenderer.invoke('asr:cancelDownload'),
+  transcribeAudio: (webmBase64: string, language?: string): Promise<TranscribeResult> =>
+    ipcRenderer.invoke('audio:transcribe', webmBase64, language),
+  speakTts: (text: string, voice: string, rate: number): Promise<SpeakResult> =>
+    ipcRenderer.invoke('tts:speak', text, voice, rate),
+  onAsrProgress: (cb: (p: AsrProgress) => void): (() => void) => {
+    const listener = (_e: unknown, p: AsrProgress): void => cb(p)
+    ipcRenderer.on('asr:progress', listener)
+    return () => {
+      ipcRenderer.removeListener('asr:progress', listener)
+    }
+  }
 }
 
 contextBridge.exposeInMainWorld('api', api)

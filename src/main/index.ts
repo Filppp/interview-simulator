@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow } from 'electron'
 import path from 'node:path'
 import { ensureDataDirs } from './store'
 import { registerIpc } from './ipc'
+import { closeWhisper } from './asr'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -50,4 +51,8 @@ void app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('will-quit', () => {
+  void closeWhisper()
 })

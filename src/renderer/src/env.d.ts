@@ -6,7 +6,11 @@ import type {
   MicStatus,
   MaterialCategory,
   MaterialDetail,
-  MaterialMeta
+  MaterialMeta,
+  AsrStatus,
+  AsrProgress,
+  TranscribeResult,
+  SpeakResult
 } from '../../shared/types'
 
 declare global {
@@ -23,6 +27,13 @@ declare global {
       pickAndAddMaterials(category: MaterialCategory): Promise<MaterialMeta[]>
       removeMaterial(id: string): Promise<void>
       previewMaterial(id: string): Promise<MaterialDetail | null>
+      getAsrStatus(): Promise<AsrStatus>
+      setupAsr(): Promise<AsrStatus>
+      downloadAsrModel(): Promise<AsrStatus>
+      cancelAsrDownload(): Promise<void>
+      transcribeAudio(webmBase64: string, language?: string): Promise<TranscribeResult>
+      speakTts(text: string, voice: string, rate: number): Promise<SpeakResult>
+      onAsrProgress(cb: (p: AsrProgress) => void): () => void
     }
   }
 }

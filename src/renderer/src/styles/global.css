@@ -581,4 +581,80 @@ textarea {
   border: 1px solid var(--card-border);
   border-radius: 8px;
   padding: 14px;
+/* ---------- 语音诊断 ---------- */
+
+.hidden-audio {
+  display: none;
 }
+
+.asr-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.asr-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.asr-label {
+  width: 80px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.ok-text {
+  color: var(--ok);
+}
+
+.warn-text {
+  color: var(--warn);
+}
+
+.bad-text {
+  color: var(--bad);
+}
+
+.dl-box {
+  margin-top: 14px;
+}
+
+.dl-bar {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+}
+
+.dl-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+.dl-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
+.transcribe-result {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.transcribe-text {
+  margin-top: 4px;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
