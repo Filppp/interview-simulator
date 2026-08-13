@@ -1,0 +1,395 @@
+:root {
+  --bg: #0f1115;
+  --bg-sidebar: #15181f;
+  --card: #1a1e27;
+  --card-border: #262b37;
+  --text: #e6e9ef;
+  --text-dim: #8b93a3;
+  --accent: #4f8cff;
+  --accent-weak: rgba(79, 140, 255, 0.14);
+  --ok: #3ecf8e;
+  --bad: #ff6b6b;
+  --warn: #f5a623;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Segoe UI',
+    sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+input,
+select,
+textarea {
+  user-select: text;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* ---------- 侧边栏 ---------- */
+.sidebar {
+  width: 216px;
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 12px;
+}
+
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 18px;
+}
+
+.logo {
+  font-size: 26px;
+}
+
+.logo-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.logo-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--accent-weak);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-icon {
+  width: 20px;
+  text-align: center;
+}
+
+.sidebar-footer {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 8px;
+}
+
+/* ---------- 内容区 ---------- */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+}
+
+.page {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.page-header p {
+  color: var(--text-dim);
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.page-loading {
+  color: var(--text-dim);
+  padding: 40px;
+  text-align: center;
+}
+
+/* ---------- 卡片 ---------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.placeholder h2 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.placeholder p {
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
+/* ---------- 表单 ---------- */
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.form-row > label {
+  width: 120px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.form-row input[type='text'],
+.form-row input[type='password'],
+.form-row input[type='number'],
+.form-row select {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.form-row input:focus,
+.form-row select:focus {
+  border-color: var(--accent);
+}
+
+.form-row input[type='range'] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.checkbox-row input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 10px;
+  line-height: 1.6;
+}
+
+.inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.test-result {
+  font-size: 12px;
+}
+
+.test-result.ok {
+  color: var(--ok);
+}
+
+.test-result.bad {
+  color: var(--bad);
+}
+
+.mic-status.ok {
+  color: var(--ok);
+}
+
+.mic-status.bad {
+  color: var(--bad);
+}
+
+.mic-status.warn {
+  color: var(--warn);
+}
+
+/* ---------- 按钮 ---------- */
+.btn {
+  background: var(--card-border);
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.sticky-save {
+  position: sticky;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 17, 21, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.saved-tip {
+  color: var(--ok);
+  font-size: 13px;
+}
+
+/* ---------- 键值展示 ---------- */
+.kv div {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.kv span {
+  width: 90px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.kv code {
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  padding: 4px 8px;
+  border-radius: 5px;
+  word-break: break-all;
+}
+
+/* ---------- 面试流程展示 ---------- */
+.flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.flow-step {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+
+.flow-icon {
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+
+.flow-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.flow-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.flow-index {
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-weak);
+  border-radius: 20px;
+  padding: 2px 10px;
+  display: inline-block;
+}
