@@ -141,13 +141,15 @@ class WhisperWorker {
                 })
               }
             } else if (msg.type === 'error') {
+              const detail = msg.trace ? `\n${msg.trace}` : ''
+              const errText = `${msg.message ?? '识别失败'}${detail}`
               const p = this.pending.get(String(msg.id ?? 'worker'))
               if (p) {
                 this.pending.delete(String(msg.id ?? 'worker'))
-                p.reject(new Error(msg.message ?? '识别失败'))
+                p.reject(new Error(errText))
               } else if (!started) {
                 started = true
-                reject(new Error(msg.message ?? '引擎启动失败'))
+                reject(new Error(errText))
               }
             } else if (msg.type === 'pong') {
               /* 心跳 */
@@ -160,7 +162,10 @@ class WhisperWorker {
 
       proc.stderr.on('data', (d: Buffer) => {
         const s = d.toString('utf-8').trim()
-        if (s) console.error('[whisper-worker]', s)
+        if (s) {
+          console.error('[whisper-worker]', s)
+          void appendLog(s)
+        }
       })
 
       proc.on('error', (e) => {
@@ -379,4 +384,18 @@ export async function transcribeAudio(
 /** 应用退出时关闭识别进程 */
 export async function closeWhisper(): Promise<void> {
   if (worker) await worker.close()
+}
+
+/** 追加 whisper 日志到文件（排查用） */
+let logPath: string | null = null
+async function appendLog(line: string): Promise<void> {
+  try {
+    if (!logPath) {
+      mkdirSync(path.join(dataRoot(), 'logs'), { recursive: true })
+      logPath = path.join(dataRoot(), 'logs', 'whisper-worker.log')
+    }
+    await fs.appendFile(logPath, `[${new Date().toISOString()}] ${line}\n`, 'utf-8')
+  } catch {
+    /* 忽略日志写入错误 */
+  }
 }

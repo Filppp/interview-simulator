@@ -80,11 +80,10 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const textInputRef = useRef<HTMLInputElement | null>(null)
 
-  // 录音（实时识别 + 完整识别双通道）
-  const recFullRef = useRef<MediaRecorder | null>(null)
-  const recLiveRef = useRef<MediaRecorder | null>(null)
-  const fullChunksRef = useRef<Blob[]>([]) // 完整录音块
-  const pendingChunksRef = useRef<Blob[]>([]) // 实时预览块队列
+  // 录音（累积识别）
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([]) // 全部录音块（拼接后可解码）
+  const pendingChunksRef = useRef<Blob[]>([]) // 触发累积识别的信号队列
   const processingRef = useRef(false)
   const streamRef = useRef<MediaStream | null>(null)
   const recordingRef = useRef(false)
@@ -364,17 +363,20 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
 
   /* ---------- 录音（实时识别 + 完整识别双通道） ---------- */
 
-  /** 串行识别增量音频块，实时追加到预览文本 */
-  const transcribeChunk = useCallback(async (): Promise<void> => {
+  /** 累积识别：把已录的全部音频拼接识别（拼接 webm 可解码），替换式更新预览 */
+  const transcribeAll = useCallback(async (): Promise<void> => {
     if (processingRef.current) return
     processingRef.current = true
     try {
       while (pendingChunksRef.current.length > 0) {
-        const chunk = pendingChunksRef.current.shift()!
-        const buf = new Uint8Array(await chunk.arrayBuffer())
+        pendingChunksRef.current = [] // 累积全量识别，丢弃按块增量
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const buf = new Uint8Array(await blob.arrayBuffer())
         const r: TranscribeResult = await window.api.transcribeAudio(arrayBufferToBase64(buf))
         if (r.ok && r.text) {
-          setLiveText((prev) => (prev ? prev + r.text : r.text))
+          setLiveText(r.text) // 替换式：显示到目前为]的全部识别文本
+        } else if (!r.ok) {
+          setLiveText('')
         }
       }
     } finally {
@@ -395,27 +397,20 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
-      // 通道1：完整录音（不分块，stop 后是合法完整 webm，用于最终识别）
-      const recFull = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
-      fullChunksRef.current = []
-      recFull.ondataavailable = (e) => {
-        if (e.data.size > 0) fullChunksRef.current.push(e.data)
-      }
-      recFullRef.current = recFull
-      // 通道2：分块录音（每 2s 一块，用于实时预览识别）
-      const recLive = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      // 单个录音器：2s 分块累积；拼接块可解码（ffmpeg 处理级联 Segment）
+      const rec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      chunksRef.current = []
       pendingChunksRef.current = []
-      recLive.ondataavailable = (e) => {
+      rec.ondataavailable = (e) => {
         if (e.data.size > 0) {
+          chunksRef.current.push(e.data)
           pendingChunksRef.current.push(e.data)
-          void transcribeChunk()
+          void transcribeAll()
         }
       }
-      recLiveRef.current = recLive
-
+      recorderRef.current = rec
       setLiveText('')
-      recFull.start()
-      recLive.start(2000)
+      rec.start(2000)
       recordingRef.current = true
       recStartRef.current = Date.now()
       setRecording(true)
@@ -423,17 +418,15 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     } catch (e) {
       setError(`无法录音：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [transcribeChunk])
+  }, [transcribeAll])
 
   /** 停止录音并发送识别结果 */
   const stopRecording = useCallback((): void => {
     if (!recordingRef.current) return
     recordingRef.current = false
     setRecording(false)
-    // 停止两个录音器（触发各自的 ondataavailable / onstop）
     try {
-      recLiveRef.current?.stop()
-      recFullRef.current?.stop()
+      recorderRef.current?.stop()
     } catch {
       /* ignore */
     }
@@ -449,12 +442,12 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
       setTranscribing(true)
       try {
         const live = liveText.trim()
-        // 长录音（>25s）直接用实时拼接文本，避免全量识别耗时过长
+        // 长录音（>25s）直接用实时识别文本，避免全量识别耗时过长
         if (durationSec > 25 && live) {
           await sendUser(live)
         } else {
-          // 完整录音最终识别（单次录制，webm 合法，识别最准）
-          const blob = new Blob(fullChunksRef.current, { type: 'audio/webm' })
+          // 全量拼接识别（块拼接可解码，最准）
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
           const buf = new Uint8Array(await blob.arrayBuffer())
           const r: TranscribeResult = await window.api.transcribeAudio(arrayBufferToBase64(buf))
           if (r.ok && r.text) {
@@ -471,6 +464,7 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
       }
     })()
   }, [sendUser])
+
 
 
   if (!settings || !style) return <div className="page-loading">加载中…</div>
