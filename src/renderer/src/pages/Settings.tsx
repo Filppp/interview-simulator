@@ -327,17 +327,23 @@ export default function Settings(): React.JSX.Element {
 
       <section className="card">
         <h2 className="card-title">🎭 面试官风格（默认）</h2>
-        <div className="form-row">
-          <label>预设模板</label>
-          <select
-            value={settings.style.preset}
-            onChange={(e) => update({ style: { ...settings.style, preset: e.target.value as InterviewSettings['style']['preset'] } })}
-          >
-            <option value="gentle">温和引导型</option>
-            <option value="standard">标准型（真实复试）</option>
-            <option value="strict">压力型</option>
-            <option value="academic">学术深挖型</option>
-          </select>
+        <div className="preset-row">
+          {([
+            { key: 'gentle', label: '温和引导型', desc: '多鼓励，不施压' },
+            { key: 'standard', label: '标准型', desc: '贴近真实复试' },
+            { key: 'strict', label: '压力型', desc: '连环追问施压' },
+            { key: 'academic', label: '学术深挖型', desc: '重原理与推导' }
+          ] as Array<{ key: InterviewSettings['style']['preset']; label: string; desc: string }>).map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              className={`preset-btn${settings.style.preset === p.key ? ' active' : ''}`}
+              onClick={() => update({ style: { ...settings.style, preset: p.key } })}
+            >
+              <strong>{p.label}</strong>
+              <span>{p.desc}</span>
+            </button>
+          ))}
         </div>
         <div className="form-row">
           <label>追问深度：{settings.style.followUpDepth}</label>
