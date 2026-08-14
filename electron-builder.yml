@@ -1,0 +1,27 @@
+appId: com.interviewsimulator.desktop
+productName: 面试模拟器
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+asar: true
+npmRebuild: false
+mac:
+  target:
+    - dmg
+  category: public.app-category.education
+  icon: build/icon.icns
+  # 无开发者证书：不签名（首次打开需右键→打开）
+  identity: null
+dmg:
+  title: 面试模拟器
+  icon: build/icon.icns
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications

@@ -4,6 +4,10 @@ import { ensureDataDirs } from './store'
 import { registerIpc } from './ipc'
 import { closeWhisper } from './asr'
 
+// 统一数据目录：dev 与打包版共用（~Library/Application Support/interview-simulator），
+// 避免打包后产品名变化导致设置/资料/模型/历史丢失。需在 app ready 前设置。
+app.setPath('userData', path.join(app.getPath('appData'), 'interview-simulator'))
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
