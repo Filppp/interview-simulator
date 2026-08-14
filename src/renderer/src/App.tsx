@@ -1,15 +1,18 @@
 import { useState } from 'react'
+
 import Settings from './pages/Settings'
 import Library from './pages/Library'
 import Interview from './pages/Interview'
 import Report from './pages/Report'
 import History from './pages/History'
+import Schools from './pages/Schools'
 
-export type PageKey = 'interview' | 'library' | 'report' | 'history' | 'settings'
+export type PageKey = 'interview' | 'library' | 'schools' | 'report' | 'history' | 'settings'
 
 const NAV: Array<{ key: PageKey; label: string; icon: string }> = [
   { key: 'interview', label: '模拟面试', icon: '🎙️' },
   { key: 'library', label: '资料库', icon: '📚' },
+  { key: 'schools', label: '学校风格', icon: '🏫' },
   { key: 'report', label: '评分报告', icon: '📊' },
   { key: 'history', label: '历史记录', icon: '🕘' },
   { key: 'settings', label: '设置', icon: '⚙️' }
@@ -48,6 +51,7 @@ export default function App(): React.JSX.Element {
         {page === 'report' && <Report />}
         {page === 'history' && <History />}
         {page === 'settings' && <Settings />}
+        {page === 'schools' && <Schools />}
       </main>
     </div>
   )

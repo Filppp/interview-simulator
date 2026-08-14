@@ -10,7 +10,9 @@ import type {
   AsrStatus,
   AsrProgress,
   TranscribeResult,
-  SpeakResult
+  SpeakResult,
+  SchoolProfile,
+  AskPayload
 } from '../shared/types'
 
 const api = {
@@ -46,7 +48,17 @@ const api = {
     return () => {
       ipcRenderer.removeListener('asr:progress', listener)
     }
-  }
+  },
+
+  listSchools: (): Promise<SchoolProfile[]> => ipcRenderer.invoke('schools:list'),
+  saveSchool: (input: { id?: string; name: string; target: string; notes: string[] }): Promise<SchoolProfile> =>
+    ipcRenderer.invoke('schools:save', input),
+  removeSchool: (id: string): Promise<void> => ipcRenderer.invoke('schools:remove', id),
+  pickAndImportSchoolFiles: (schoolId: string): Promise<SchoolProfile | null> =>
+    ipcRenderer.invoke('schools:pickAndImport', schoolId),
+
+  askInterviewer: (payload: AskPayload): Promise<string> => ipcRenderer.invoke('interview:ask', payload),
+  getSchoolNotes: (schoolId: string): Promise<string> => ipcRenderer.invoke('interview:schoolNotes', schoolId)
 }
 
 contextBridge.exposeInMainWorld('api', api)

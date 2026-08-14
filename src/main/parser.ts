@@ -8,13 +8,13 @@ export interface ParseResult {
   pageCount: number | null
 }
 
-const SUPPORTED_EXTS = ['.pdf', '.docx']
+const SUPPORTED_EXTS = ['.pdf', '.docx', '.txt', '.md']
 
 export function isSupportedFile(filePath: string): boolean {
   return SUPPORTED_EXTS.includes(path.extname(filePath).toLowerCase())
 }
 
-/** 解析 PDF / Word 文件为纯文本 */
+/** 解析 PDF / Word / 纯文本文件为纯文本 */
 export async function parseFile(absPath: string): Promise<ParseResult> {
   const ext = path.extname(absPath).toLowerCase()
 
@@ -31,6 +31,11 @@ export async function parseFile(absPath: string): Promise<ParseResult> {
   if (ext === '.docx') {
     const result = await mammoth.extractRawText({ path: absPath })
     return { text: result.value, pageCount: null }
+  }
+
+  if (ext === '.txt' || ext === '.md') {
+    const text = await fs.readFile(absPath, 'utf-8')
+    return { text, pageCount: null }
   }
 
   throw new Error(`不支持的文件格式：${ext || '(无扩展名)'}`)

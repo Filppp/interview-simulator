@@ -16,7 +16,14 @@ export const DEFAULT_SETTINGS: InterviewSettings = {
   voiceEnabled: true,
   ttsVoiceZh: 'zh-CN-XiaoxiaoNeural',
   ttsVoiceEn: 'en-US-AriaNeural',
-  ttsSpeed: 1.0
+  ttsSpeed: 1.0,
+  style: {
+    preset: 'standard',
+    followUpDepth: 3,
+    englishDifficulty: 3,
+    pressureLevel: 2,
+    customNote: ''
+  }
 }
 
 /** 应用数据根目录（资料、录音、历史、模型等） */

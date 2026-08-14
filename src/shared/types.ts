@@ -27,7 +27,10 @@ export interface InterviewSettings {
   ttsVoiceEn: string
   /** TTS 语速倍率 */
   ttsSpeed: number
+  /** 面试官风格 */
+  style: InterviewStyle
 }
+
 
 export interface AppInfo {
   appVersion: string
@@ -118,3 +121,70 @@ export interface SpeakResult {
   mime: string
   error?: string
 }
+
+/* ---------- 面试（M4） ---------- */
+
+export type StylePreset = 'gentle' | 'standard' | 'strict' | 'academic'
+
+export interface InterviewStyle {
+  /** 预设模板 */
+  preset: StylePreset
+  /** 追问深度 1-5 */
+  followUpDepth: number
+  /** 英语难度 1-5 */
+  englishDifficulty: number
+  /** 压力程度 1-5 */
+  pressureLevel: number
+  /** 自由描述（追加指令） */
+  customNote: string
+}
+
+export interface SchoolProfile {
+  id: string
+  /** 学校名称 */
+  name: string
+  /** 报考类型：复试/保研/夏令营 */
+  target: string
+  /** 手动录入的风格描述 / 真题回忆等 */
+  notes: string[]
+  /** 导入文件的来源文件名（内容已解析并入 notes） */
+  files: string[]
+  addedAt: string
+}
+
+export type InterviewStage = 'intro' | 'english' | 'major' | 'resume'
+
+export interface ChatMessage {
+  role: 'assistant' | 'user'
+  content: string
+}
+
+export type AskIntent = 'question' | 'answer' | 'hint' | 'skip' | 'introFollowup'
+
+export interface AskPayload {
+  stage: InterviewStage
+  /** 当前题号（0 起） */
+  questionIndex: number
+  totalQuestions: number
+  intent: AskIntent
+  /** 本问题内已作答次数（用于控制追问轮数） */
+  answersThisQuestion: number
+  history: ChatMessage[]
+  /** 本阶段资料片段（已截断） */
+  stageContext: string
+  style: InterviewStyle
+  /** 绑定的学校风格笔记（已截断） */
+  schoolNotes: string
+  /** 自我介绍原文（resume 阶段提问依据之一） */
+  selfIntro?: string
+}
+
+export interface InterviewConfig {
+  schoolId: string | null
+  style: InterviewStyle
+  useVoice: boolean
+  useEnglishMaterials: boolean
+  useMajorMaterials: boolean
+  useResume: boolean
+}
+

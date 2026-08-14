@@ -10,7 +10,9 @@ import type {
   AsrStatus,
   AsrProgress,
   TranscribeResult,
-  SpeakResult
+  SpeakResult,
+  SchoolProfile,
+  AskPayload
 } from '../../shared/types'
 
 declare global {
@@ -34,6 +36,12 @@ declare global {
       transcribeAudio(webmBase64: string, language?: string): Promise<TranscribeResult>
       speakTts(text: string, voice: string, rate: number): Promise<SpeakResult>
       onAsrProgress(cb: (p: AsrProgress) => void): () => void
+      listSchools(): Promise<SchoolProfile[]>
+      saveSchool(input: { id?: string; name: string; target: string; notes: string[] }): Promise<SchoolProfile>
+      removeSchool(id: string): Promise<void>
+      pickAndImportSchoolFiles(schoolId: string): Promise<SchoolProfile | null>
+      askInterviewer(payload: AskPayload): Promise<string>
+      getSchoolNotes(schoolId: string): Promise<string>
     }
   }
 }

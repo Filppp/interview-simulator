@@ -5,9 +5,12 @@ import { testApiKey } from './llm'
 import { ensureIndex, listMaterials, addMaterials, removeMaterial, getMaterialDetail } from './materials'
 import { getAsrStatus, setupEngine, downloadModel, cancelModelDownload, transcribeAudio } from './asr'
 import { synthesize } from './tts'
+import { listSchools, saveSchool, removeSchool, importSchoolFiles, getSchoolNotes } from './schools'
+import { askInterviewer } from './interview'
 import type {
   AppInfo,
   AsrProgress,
+  AskPayload,
   InterviewSettings,
   MaterialCategory,
   MaterialDetail,
@@ -108,6 +111,35 @@ export function registerIpc(): void {
     (_e, text: string, voice: string, rate: number): Promise<SpeakResult> =>
       synthesize(text, voice, rate)
   )
+
+  /* ---------- 学校风格库（M4） ---------- */
+
+  ipcMain.handle('schools:list', () => listSchools())
+
+  ipcMain.handle('schools:save', (_e, input: { id?: string; name: string; target: string; notes: string[] }) =>
+    saveSchool(input))
+
+  ipcMain.handle('schools:remove', (_e, id: string) => removeSchool(id))
+
+  // 弹出文件选择框导入学校风格资料
+  ipcMain.handle('schools:pickAndImport', async (_e, schoolId: string) => {
+    const win = getWindow()
+    const result = await dialog.showOpenDialog(win!, {
+      title: '选择风格资料文件（PDF/Word/TXT）',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: '文档', extensions: ['pdf', 'docx', 'txt', 'md'] }
+      ]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return importSchoolFiles(schoolId, result.filePaths)
+  })
+
+  /* ---------- 面试（M4） ---------- */
+
+  ipcMain.handle('interview:ask', (_e, payload: AskPayload) => askInterviewer(payload))
+
+  ipcMain.handle('interview:schoolNotes', (_e, schoolId: string) => getSchoolNotes(schoolId))
 
   // 首次启动时若索引缺失则扫描重建
   void ensureIndex()

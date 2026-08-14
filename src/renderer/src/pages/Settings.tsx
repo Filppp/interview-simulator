@@ -326,6 +326,65 @@ export default function Settings(): React.JSX.Element {
       </section>
 
       <section className="card">
+        <h2 className="card-title">🎭 面试官风格（默认）</h2>
+        <div className="form-row">
+          <label>预设模板</label>
+          <select
+            value={settings.style.preset}
+            onChange={(e) => update({ style: { ...settings.style, preset: e.target.value as InterviewSettings['style']['preset'] } })}
+          >
+            <option value="gentle">温和引导型</option>
+            <option value="standard">标准型（真实复试）</option>
+            <option value="strict">压力型</option>
+            <option value="academic">学术深挖型</option>
+          </select>
+        </div>
+        <div className="form-row">
+          <label>追问深度：{settings.style.followUpDepth}</label>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={settings.style.followUpDepth}
+            onChange={(e) => update({ style: { ...settings.style, followUpDepth: Number(e.target.value) } })}
+          />
+        </div>
+        <div className="form-row">
+          <label>英语难度：{settings.style.englishDifficulty}</label>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={settings.style.englishDifficulty}
+            onChange={(e) => update({ style: { ...settings.style, englishDifficulty: Number(e.target.value) } })}
+          />
+        </div>
+        <div className="form-row">
+          <label>压力程度：{settings.style.pressureLevel}</label>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            value={settings.style.pressureLevel}
+            onChange={(e) => update({ style: { ...settings.style, pressureLevel: Number(e.target.value) } })}
+          />
+        </div>
+        <div className="form-row">
+          <label>自由描述</label>
+          <textarea
+            rows={3}
+            value={settings.style.customNote}
+            placeholder="例如：多问科研项目细节，追问时保持严肃，不要夸奖考生…"
+            onChange={(e) => update({ style: { ...settings.style, customNote: e.target.value } })}
+          />
+        </div>
+        <p className="hint">
+          这里是默认风格；开始面试时还可以针对本次练习临时调整。
+          结合「学校风格」页面录制的目标院校风格，面试官会更贴近真实。
+        </p>
+      </section>
+
+      <section className="card">
         <h2 className="card-title">🔊 语音合成（Edge TTS）</h2>
         <label className="checkbox-row">
           <input
