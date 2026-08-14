@@ -7,7 +7,8 @@ import { getAsrStatus, setupEngine, downloadModel, cancelModelDownload, transcri
 import { synthesize } from './tts'
 import { listSchools, saveSchool, removeSchool, importSchoolFiles, getSchoolNotes } from './schools'
 import { askInterviewer } from './interview'
-import { listHistory, getRecord, removeRecord, createReport, buildMarkdown } from './history'
+import { listHistory, getRecord, removeRecord, createReport, buildMarkdown, buildAnswersMarkdown, saveReferenceAnswers } from './history'
+import { generateReferenceAnswers } from './report'
 import type {
   AppInfo,
   AsrProgress,
@@ -166,6 +167,31 @@ export function registerIpc(): void {
     })
     if (result.canceled || !result.filePath) return { ok: false, message: '已取消' }
     await (await import('node:fs')).promises.writeFile(result.filePath, buildMarkdown(rec), 'utf-8')
+    return { ok: true, filePath: result.filePath }
+  })
+
+  // 生成参考答案（面试后复盘用）
+  ipcMain.handle('report:generateReferenceAnswers', async (_e, id: string) => {
+    const rec = await getRecord(id)
+    if (!rec) return { ok: false, message: '记录不存在' }
+    const md = await generateReferenceAnswers(rec)
+    await saveReferenceAnswers(id, md)
+    return { ok: true, markdown: md }
+  })
+
+  // 导出「我的回答汇总」
+  ipcMain.handle('report:exportAnswers', async (_e, id: string) => {
+    const rec = await getRecord(id)
+    if (!rec) return { ok: false, message: '记录不存在' }
+    const win = getWindow()
+    const stamp = new Date(rec.startedAt).toISOString().slice(0, 10)
+    const result = await dialog.showSaveDialog(win!, {
+      title: '导出我的回答汇总',
+      defaultPath: `我的面试回答-${stamp}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    })
+    if (result.canceled || !result.filePath) return { ok: false, message: '已取消' }
+    await (await import('node:fs')).promises.writeFile(result.filePath, buildAnswersMarkdown(rec), 'utf-8')
     return { ok: true, filePath: result.filePath }
   })
 

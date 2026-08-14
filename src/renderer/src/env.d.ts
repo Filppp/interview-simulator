@@ -50,6 +50,8 @@ declare global {
       getHistoryRecord(id: string): Promise<InterviewReport | null>
       removeHistoryRecord(id: string): Promise<void>
       exportReportMarkdown(id: string): Promise<{ ok: boolean; filePath?: string; message?: string }>
+      generateReferenceAnswers(id: string): Promise<{ ok: boolean; markdown?: string; message?: string }>
+      exportAnswers(id: string): Promise<{ ok: boolean; filePath?: string; message?: string }>
     }
   }
 }

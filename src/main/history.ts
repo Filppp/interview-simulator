@@ -128,3 +128,30 @@ export function buildMarkdown(rec: InterviewReport): string {
   }
   return lines.join('\n')
 }
+
+/** 生成「我的回答汇总」Markdown（面试全记录，重点是我的回答） */
+export function buildAnswersMarkdown(rec: InterviewReport): string {
+  const esc = (s: string): string => s.replace(/\|/g, '\\|')
+  const lines: string[] = []
+  lines.push('# 我的面试回答汇总')
+  lines.push('')
+  lines.push(`- 面试时间：${new Date(rec.startedAt).toLocaleString('zh-CN')}`)
+  lines.push(`- 时长：${Math.round(rec.durationSec / 60)} 分钟`)
+  if (rec.schoolName) lines.push(`- 目标学校：${esc(rec.schoolName)}`)
+  lines.push('')
+  for (const m of rec.messages) {
+    const label = m.role === 'assistant' ? '**面试官**' : '**我的回答**'
+    lines.push(`${label}：${m.content.replace(/\n/g, '\n> ')}`)
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
+/** 保存参考答案到记录 */
+export async function saveReferenceAnswers(id: string, md: string): Promise<InterviewReport | null> {
+  const rec = await getRecord(id)
+  if (!rec) return null
+  rec.referenceAnswers = md
+  await fs.writeFile(recordFile(id), JSON.stringify(rec, null, 2), 'utf-8')
+  return rec
+}

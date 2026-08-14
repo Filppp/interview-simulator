@@ -80,12 +80,14 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const textInputRef = useRef<HTMLInputElement | null>(null)
 
-  // 录音
+  // 录音（实时识别）
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+  const pendingChunksRef = useRef<Blob[]>([])
+  const processingRef = useRef(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
-
+  const [liveText, setLiveText] = useState('')
   const stage = STAGES[stageIdx].key
 
   useEffect(() => {
@@ -170,9 +172,11 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
         }
         const reply = await window.api.askInterviewer(payload)
         appendAssistant(reply)
-        await speak(reply, stage === 'english')
+        // 只朗读提问，点评/提示/追问不朗读
+        if (intent === 'question') {
+          await speak(reply, stage === 'english')
+        }
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
       } finally {
         setThinking(false)
       }
@@ -269,14 +273,13 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
         }
         const reply = await window.api.askInterviewer(payload)
         appendAssistant(reply)
-        await speak(reply, false)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       } finally {
         setThinking(false)
       }
     })()
-  }, [messages, style, appendAssistant, speak])
+  }, [messages, style, appendAssistant])
 
   const handleHint = useCallback((): void => {
     void ask('hint')
@@ -346,40 +349,74 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     }
   }, [style, elapsed, schoolId, schools, messages, onReportReady])
 
-  /* ---------- 录音 ---------- */
+  /* ---------- 录音（实时识别） ---------- */
+
+  /** 串行识别增量音频块，实时追加到预览文本 */
+  const transcribeChunk = useCallback(async (): Promise<void> => {
+    if (processingRef.current) return
+    processingRef.current = true
+    try {
+      while (pendingChunksRef.current.length > 0) {
+        const chunk = pendingChunksRef.current.shift()!
+        const buf = new Uint8Array(await chunk.arrayBuffer())
+        const r: TranscribeResult = await window.api.transcribeAudio(arrayBufferToBase64(buf))
+        if (r.ok && r.text) {
+          setLiveText((prev) => (prev ? prev + r.text : r.text))
+        }
+      }
+    } finally {
+      processingRef.current = false
+    }
+  }, [])
+
   const startRecording = useCallback(async (): Promise<void> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const rec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
       chunksRef.current = []
+      pendingChunksRef.current = []
+      setLiveText('')
+      // 每 2.5s 产出一块音频 → 立即增量识别（边说边出字）
       rec.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data)
+          pendingChunksRef.current.push(e.data)
+          void transcribeChunk()
+        }
       }
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop())
         void (async () => {
-          const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-          const buf = new Uint8Array(await blob.arrayBuffer())
+          // 等增量识别队列清空
+          while (processingRef.current || pendingChunksRef.current.length > 0) {
+            await new Promise((r) => setTimeout(r, 200))
+          }
           setTranscribing(true)
           try {
+            // 全量音频最终识别，保证完整准确
+            const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+            const buf = new Uint8Array(await blob.arrayBuffer())
             const r: TranscribeResult = await window.api.transcribeAudio(arrayBufferToBase64(buf))
             if (r.ok && r.text) {
               await sendUser(r.text)
+            } else if (liveText) {
+              await sendUser(liveText)
             } else if (!r.ok) {
               setError(r.error ?? '识别失败')
             }
+            setLiveText('')
           } finally {
             setTranscribing(false)
           }
         })()
       }
-      rec.start()
+      rec.start(2500)
       recorderRef.current = rec
       setRecording(true)
     } catch (e) {
       setError(`无法录音：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [sendUser])
+  }, [sendUser, transcribeChunk])
 
   const stopRecording = useCallback((): void => {
     if (recorderRef.current && recorderRef.current.state !== 'inactive') {
@@ -648,6 +685,10 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
           发送
         </button>
       </div>
+      {recording && liveText && (
+        <div className="live-text">🎙️ 实时识别：{liveText}</div>
+      )}
+      {transcribing && !recording && <div className="live-text">⏳ 正在识别完整录音…</div>}
       <audio ref={audioRef} className="hidden-audio" />
     </div>
   )

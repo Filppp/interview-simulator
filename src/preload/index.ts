@@ -70,7 +70,11 @@ const api = {
     ipcRenderer.invoke('history:get', id),
   removeHistoryRecord: (id: string): Promise<void> => ipcRenderer.invoke('history:remove', id),
   exportReportMarkdown: (id: string): Promise<{ ok: boolean; filePath?: string; message?: string }> =>
-    ipcRenderer.invoke('report:exportMarkdown', id)
+    ipcRenderer.invoke('report:exportMarkdown', id),
+  generateReferenceAnswers: (id: string): Promise<{ ok: boolean; markdown?: string; message?: string }> =>
+    ipcRenderer.invoke('report:generateReferenceAnswers', id),
+  exportAnswers: (id: string): Promise<{ ok: boolean; filePath?: string; message?: string }> =>
+    ipcRenderer.invoke('report:exportAnswers', id)
 }
 
 contextBridge.exposeInMainWorld('api', api)

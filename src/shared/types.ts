@@ -218,6 +218,8 @@ export interface InterviewReport {
   comment: string
   suggestions: string[]
   messages: ChatMessage[]
+  /** 面试后生成的参考答案（Markdown） */
+  referenceAnswers?: string
 }
 
 export interface HistorySummary {

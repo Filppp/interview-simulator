@@ -1078,3 +1078,20 @@ textarea:focus {
 }
 
 
+
+/* ---------- 实时识别预览 ---------- */
+
+.live-text {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--card);
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  line-height: 1.6;
+}
+
+.ref-block {
+  margin-top: 14px;
+}

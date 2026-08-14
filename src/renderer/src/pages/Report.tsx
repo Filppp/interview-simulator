@@ -36,6 +36,9 @@ export default function Report({ reportId }: { reportId: string | null }): React
   const [loading, setLoading] = useState(false)
   const [replayOpen, setReplayOpen] = useState(false)
   const [exportMsg, setExportMsg] = useState<string | null>(null)
+  const [genRef, setGenRef] = useState(false)
+  const [refOpen, setRefOpen] = useState(false)
+  const [refError, setRefError] = useState<string | null>(null)
 
   useEffect(() => {
     setReport(null)
@@ -51,6 +54,31 @@ export default function Report({ reportId }: { reportId: string | null }): React
     if (!report) return
     const r = await window.api.exportReportMarkdown(report.id)
     setExportMsg(r.ok ? `✅ 已导出：${r.filePath}` : r.message ?? '导出失败')
+  }
+
+  const handleExportAnswers = async (): Promise<void> => {
+    if (!report) return
+    const r = await window.api.exportAnswers(report.id)
+    setExportMsg(r.ok ? `✅ 已导出我的回答：${r.filePath}` : r.message ?? '导出失败')
+  }
+
+  const handleGenerateReference = async (): Promise<void> => {
+    if (!report) return
+    setGenRef(true)
+    setRefError(null)
+    try {
+      const r = await window.api.generateReferenceAnswers(report.id)
+      if (r.ok && r.markdown) {
+        setReport({ ...report, referenceAnswers: r.markdown })
+        setRefOpen(true)
+      } else {
+        setRefError(r.message ?? '生成失败')
+      }
+    } catch (e) {
+      setRefError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setGenRef(false)
+    }
   }
 
   if (!reportId) {
@@ -157,11 +185,28 @@ export default function Report({ reportId }: { reportId: string | null }): React
           <button className="btn" onClick={() => setReplayOpen((o) => !o)}>
             {replayOpen ? '收起问答回放' : `📜 展开问答回放（${report.messages.length} 条）`}
           </button>
-          <button className="btn primary" onClick={() => void handleExport()}>
-            📤 导出 Markdown
+          <button className="btn" onClick={() => void handleExportAnswers()}>
+            📝 导出我的回答
+          </button>
+          <button className="btn primary" onClick={() => void handleGenerateReference()} disabled={genRef}>
+            {genRef ? '⏳ 生成中（约 30 秒）…' : '💡 生成参考答案'}
+          </button>
+          <button className="btn" onClick={() => void handleExport()}>
+            📤 导出报告
           </button>
         </div>
         {exportMsg && <p className="hint">{exportMsg}</p>}
+        {refError && <p className="hint bad-text">⚠️ {refError}</p>}
+        {report.referenceAnswers && (
+          <div className="ref-block">
+            <div className="cat-bar" style={{ marginBottom: 8 }}>
+              <button className="btn small" onClick={() => setRefOpen((o) => !o)}>
+                {refOpen ? '收起参考答案' : '展开参考答案'}
+              </button>
+            </div>
+            {refOpen && <pre className="preview-body">{report.referenceAnswers}</pre>}
+          </div>
+        )}
         {replayOpen && (
           <div className="replay">
             {report.messages.map((m, i) => (

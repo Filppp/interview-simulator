@@ -1,5 +1,5 @@
 import { chatCompletion } from './llm'
-import type { ScoreGroup, SessionToReport } from '../shared/types'
+import type { ChatMessage, ScoreGroup, SessionToReport } from '../shared/types'
 
 export interface ReportContent {
   scores: ScoreGroup
@@ -91,4 +91,33 @@ export function computeTotal(scores: ScoreGroup): number {
   const parts = [avg(scores.intro), avg(scores.english), avg(scores.major), avg(scores.resume)]
   const total = parts.reduce((a, b) => a + b, 0) / parts.length
   return Math.round(total * 10) / 10
+}
+
+const REFERENCE_PROMPT = `你是资深的研究生复试辅导老师。下面是考生一次模拟面试的完整记录（面试官/考生交替发言）。
+
+请从中提取面试官提出的每一个问题（包括追问与提示请求），并为每个问题给出高质量参考答案，帮助考生复盘提高。
+
+输出要求（直接输出 Markdown，不要代码块围栏、不要多余说明）：
+## 问题 1：<问题原文>
+- 答题要点：2-3 条关键点
+- 参考答案：2-4 句完整、准确、有条理的回答
+
+（依次列出所有问题；问题较多时全部列出）
+
+面试记录：
+"""
+%s
+"""`
+
+/** 面试结束后：为记录中的每道问题生成参考答案（Markdown） */
+export async function generateReferenceAnswers(record: { messages: ChatMessage[] }): Promise<string> {
+  const text = record.messages
+    .map((m) => `${m.role === 'assistant' ? '面试官' : '考生'}：${m.content}`)
+    .join('\n\n')
+  const prompt = REFERENCE_PROMPT.replace('%s', text.slice(0, 20000))
+  return chatCompletion([{ role: 'assistant', content: prompt }], {
+    maxTokens: 4000,
+    temperature: 0.5,
+    timeoutMs: 180000
+  })
 }
