@@ -895,3 +895,186 @@ textarea:focus {
   border-color: var(--accent);
 }
 
+/* ---------- 评分报告页 ---------- */
+
+.report-hero {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.report-total {
+  width: 130px;
+  flex-shrink: 0;
+  text-align: center;
+  border-radius: 12px;
+  padding: 18px 12px;
+  border: 1px solid var(--card-border);
+}
+
+.report-total.excellent {
+  background: rgba(62, 207, 142, 0.12);
+  border-color: rgba(62, 207, 142, 0.4);
+}
+
+.report-total.good {
+  background: var(--accent-weak);
+  border-color: rgba(79, 140, 255, 0.4);
+}
+
+.report-total.mid {
+  background: rgba(245, 166, 35, 0.1);
+  border-color: rgba(245, 166, 35, 0.4);
+}
+
+.report-total.poor {
+  background: rgba(255, 107, 107, 0.1);
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+.report-total-num {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.report-total-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.report-comment {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-comment p {
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.suggestions {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.suggestions li {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.score-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .score-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.score-card {
+  margin-bottom: 0;
+}
+
+.score-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.score-avg {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.score-name {
+  width: 76px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.score-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s;
+}
+
+.score-val {
+  width: 34px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+/* ---------- 历史记录页 ---------- */
+
+.material-score {
+  font-size: 20px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 52px;
+  text-align: center;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.compare-table th,
+.compare-table td {
+  border: 1px solid var(--card-border);
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.compare-table th {
+  background: var(--bg);
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.compare-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+

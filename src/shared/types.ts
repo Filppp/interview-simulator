@@ -188,3 +188,45 @@ export interface InterviewConfig {
   useResume: boolean
 }
 
+/* ---------- 评分报告（M5） ---------- */
+
+export interface ScoreGroup {
+  intro: { structure: number; highlights: number; fluency: number; timeControl: number }
+  english: { fluency: number; pronunciation: number; grammar: number; content: number; responsiveness: number }
+  major: { accuracy: number; logic: number; depth: number; followupResponse: number }
+  resume: { depth: number; consistency: number; adaptability: number }
+}
+
+export interface SessionToReport {
+  startedAt: string
+  endedAt: string
+  durationSec: number
+  schoolName: string
+  preset: StylePreset
+  messages: ChatMessage[]
+}
+
+export interface InterviewReport {
+  id: string
+  startedAt: string
+  durationSec: number
+  schoolName: string
+  preset: StylePreset
+  scores: ScoreGroup
+  /** 加权总分 0-10 */
+  total: number
+  comment: string
+  suggestions: string[]
+  messages: ChatMessage[]
+}
+
+export interface HistorySummary {
+  id: string
+  startedAt: string
+  durationSec: number
+  schoolName: string
+  preset: StylePreset
+  total: number
+}
+
+

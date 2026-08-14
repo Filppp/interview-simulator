@@ -12,7 +12,10 @@ import type {
   TranscribeResult,
   SpeakResult,
   SchoolProfile,
-  AskPayload
+  AskPayload,
+  SessionToReport,
+  InterviewReport,
+  HistorySummary
 } from '../shared/types'
 
 const api = {
@@ -58,7 +61,16 @@ const api = {
     ipcRenderer.invoke('schools:pickAndImport', schoolId),
 
   askInterviewer: (payload: AskPayload): Promise<string> => ipcRenderer.invoke('interview:ask', payload),
-  getSchoolNotes: (schoolId: string): Promise<string> => ipcRenderer.invoke('interview:schoolNotes', schoolId)
+  getSchoolNotes: (schoolId: string): Promise<string> => ipcRenderer.invoke('interview:schoolNotes', schoolId),
+
+  generateReport: (session: SessionToReport): Promise<InterviewReport> =>
+    ipcRenderer.invoke('report:generate', session),
+  listHistory: (): Promise<HistorySummary[]> => ipcRenderer.invoke('history:list'),
+  getHistoryRecord: (id: string): Promise<InterviewReport | null> =>
+    ipcRenderer.invoke('history:get', id),
+  removeHistoryRecord: (id: string): Promise<void> => ipcRenderer.invoke('history:remove', id),
+  exportReportMarkdown: (id: string): Promise<{ ok: boolean; filePath?: string; message?: string }> =>
+    ipcRenderer.invoke('report:exportMarkdown', id)
 }
 
 contextBridge.exposeInMainWorld('api', api)

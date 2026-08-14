@@ -12,7 +12,10 @@ import type {
   TranscribeResult,
   SpeakResult,
   SchoolProfile,
-  AskPayload
+  AskPayload,
+  SessionToReport,
+  InterviewReport,
+  HistorySummary
 } from '../../shared/types'
 
 declare global {
@@ -42,6 +45,11 @@ declare global {
       pickAndImportSchoolFiles(schoolId: string): Promise<SchoolProfile | null>
       askInterviewer(payload: AskPayload): Promise<string>
       getSchoolNotes(schoolId: string): Promise<string>
+      generateReport(session: SessionToReport): Promise<InterviewReport>
+      listHistory(): Promise<HistorySummary[]>
+      getHistoryRecord(id: string): Promise<InterviewReport | null>
+      removeHistoryRecord(id: string): Promise<void>
+      exportReportMarkdown(id: string): Promise<{ ok: boolean; filePath?: string; message?: string }>
     }
   }
 }

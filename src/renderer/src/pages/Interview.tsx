@@ -42,7 +42,7 @@ function fmtTime(total: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-export default function Interview(): React.JSX.Element {
+export default function Interview({ onReportReady }: { onReportReady: (id: string) => void }): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>('setup')
 
   // 配置
@@ -61,6 +61,7 @@ export default function Interview(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const [introCountdown, setIntroCountdown] = useState(0)
+  const [generating, setGenerating] = useState(false)
 
   // 上下文缓存
   const stageContexts = useRef<Record<InterviewStage, string>>({
@@ -323,6 +324,28 @@ export default function Interview(): React.JSX.Element {
     setPhase('done')
   }, [])
 
+  /** 生成评分报告并跳转报告页 */
+  const handleGenerateReport = useCallback(async (): Promise<void> => {
+    if (!style) return
+    setGenerating(true)
+    setError(null)
+    try {
+      const record = await window.api.generateReport({
+        startedAt: new Date(sessionStart.current).toISOString(),
+        endedAt: new Date().toISOString(),
+        durationSec: elapsed,
+        schoolName: schoolId ? (schools.find((s) => s.id === schoolId)?.name ?? '') : '',
+        preset: style.preset,
+        messages
+      })
+      onReportReady(record.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setGenerating(false)
+    }
+  }, [style, elapsed, schoolId, schools, messages, onReportReady])
+
   /* ---------- 录音 ---------- */
   const startRecording = useCallback(async (): Promise<void> => {
     try {
@@ -482,12 +505,16 @@ export default function Interview(): React.JSX.Element {
           <div style={{ fontSize: 44, marginBottom: 12 }}>🎉</div>
           <h2>面试结束</h2>
           <p style={{ marginTop: 8 }}>
-            本次模拟面试已完成。评分报告功能将在 M5 里程碑实现，届时可查看分项评分、改进建议与问答回放。
+            本次模拟面试已完成。点击下方按钮生成详细评分报告（分项打分、改进建议、问答回放）。
           </p>
           <p style={{ marginTop: 4, color: 'var(--text-dim)' }}>总用时 {fmtTime(elapsed)}</p>
+          {error && <div className="err-banner" style={{ textAlign: 'left' }}>⚠️ {error}</div>}
           <div className="inline-actions" style={{ justifyContent: 'center', marginTop: 16 }}>
+            <button className="btn primary" onClick={() => void handleGenerateReport()} disabled={generating}>
+              {generating ? '⏳ 正在生成评分报告（约 20 秒）…' : '📊 生成评分报告'}
+            </button>
             <button
-              className="btn primary"
+              className="btn"
               onClick={() => {
                 setPhase('setup')
               }}

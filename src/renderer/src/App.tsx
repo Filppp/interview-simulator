@@ -20,6 +20,12 @@ const NAV: Array<{ key: PageKey; label: string; icon: string }> = [
 
 export default function App(): React.JSX.Element {
   const [page, setPage] = useState<PageKey>('interview')
+  const [reportId, setReportId] = useState<string | null>(null)
+
+  const openReport = (id: string): void => {
+    setReportId(id)
+    setPage('report')
+  }
 
   return (
     <div className="app">
@@ -46,10 +52,10 @@ export default function App(): React.JSX.Element {
         <div className="sidebar-footer">v0.1 · 开发中</div>
       </aside>
       <main className="content">
-        {page === 'interview' && <Interview />}
+        {page === 'interview' && <Interview onReportReady={openReport} />}
         {page === 'library' && <Library />}
-        {page === 'report' && <Report />}
-        {page === 'history' && <History />}
+        {page === 'report' && <Report reportId={reportId} />}
+        {page === 'history' && <History onOpenReport={openReport} />}
         {page === 'settings' && <Settings />}
         {page === 'schools' && <Schools />}
       </main>

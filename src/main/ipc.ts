@@ -7,6 +7,7 @@ import { getAsrStatus, setupEngine, downloadModel, cancelModelDownload, transcri
 import { synthesize } from './tts'
 import { listSchools, saveSchool, removeSchool, importSchoolFiles, getSchoolNotes } from './schools'
 import { askInterviewer } from './interview'
+import { listHistory, getRecord, removeRecord, createReport, buildMarkdown } from './history'
 import type {
   AppInfo,
   AsrProgress,
@@ -16,6 +17,7 @@ import type {
   MaterialDetail,
   MaterialMeta,
   SpeakResult,
+  SessionToReport,
   TranscribeResult
 } from '../shared/types'
 
@@ -140,6 +142,32 @@ export function registerIpc(): void {
   ipcMain.handle('interview:ask', (_e, payload: AskPayload) => askInterviewer(payload))
 
   ipcMain.handle('interview:schoolNotes', (_e, schoolId: string) => getSchoolNotes(schoolId))
+
+  /* ---------- 评分报告与历史（M5） ---------- */
+
+  ipcMain.handle('report:generate', (_e, session: SessionToReport) => createReport(session))
+
+  ipcMain.handle('history:list', () => listHistory())
+
+  ipcMain.handle('history:get', (_e, id: string) => getRecord(id))
+
+  ipcMain.handle('history:remove', (_e, id: string) => removeRecord(id))
+
+  // 导出 Markdown：弹保存对话框
+  ipcMain.handle('report:exportMarkdown', async (_e, id: string) => {
+    const rec = await getRecord(id)
+    if (!rec) return { ok: false, message: '记录不存在' }
+    const win = getWindow()
+    const stamp = new Date(rec.startedAt).toISOString().slice(0, 10)
+    const result = await dialog.showSaveDialog(win!, {
+      title: '导出评分报告',
+      defaultPath: `面试评分报告-${stamp}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    })
+    if (result.canceled || !result.filePath) return { ok: false, message: '已取消' }
+    await (await import('node:fs')).promises.writeFile(result.filePath, buildMarkdown(rec), 'utf-8')
+    return { ok: true, filePath: result.filePath }
+  })
 
   // 首次启动时若索引缺失则扫描重建
   void ensureIndex()
