@@ -80,14 +80,19 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const textInputRef = useRef<HTMLInputElement | null>(null)
 
-  // 录音（实时识别）
-  const recorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const pendingChunksRef = useRef<Blob[]>([])
+  // 录音（实时识别 + 完整识别双通道）
+  const recFullRef = useRef<MediaRecorder | null>(null)
+  const recLiveRef = useRef<MediaRecorder | null>(null)
+  const fullChunksRef = useRef<Blob[]>([]) // 完整录音块
+  const pendingChunksRef = useRef<Blob[]>([]) // 实时预览块队列
   const processingRef = useRef(false)
+  const streamRef = useRef<MediaStream | null>(null)
+  const recordingRef = useRef(false)
+  const recStartRef = useRef(0)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [liveText, setLiveText] = useState('')
+  const [recSeconds, setRecSeconds] = useState(0)
   const stage = STAGES[stageIdx].key
 
   useEffect(() => {
@@ -109,7 +114,6 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
   useEffect(() => {
     if (phase !== 'running') return
     timerRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - sessionStart.current) / 1000))
       if (stage === 'intro' && settings) {
         const remain = Math.max(0, settings.introSeconds - Math.floor((Date.now() - stageStart.current) / 1000))
         setIntroCountdown(remain)
@@ -119,6 +123,15 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [phase, stage, settings])
+
+  // 录音计时（每秒更新显示）
+  useEffect(() => {
+    if (!recording) return
+    const iv = setInterval(() => {
+      setRecSeconds(Math.round((Date.now() - recStartRef.current) / 1000))
+    }, 1000)
+    return () => clearInterval(iv)
+  }, [recording])
 
   const appendAssistant = useCallback((content: string): void => {
     setMessages((m) => [...m, { role: 'assistant', content }])
@@ -349,7 +362,7 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     }
   }, [style, elapsed, schoolId, schools, messages, onReportReady])
 
-  /* ---------- 录音（实时识别） ---------- */
+  /* ---------- 录音（实时识别 + 完整识别双通道） ---------- */
 
   /** 串行识别增量音频块，实时追加到预览文本 */
   const transcribeChunk = useCallback(async (): Promise<void> => {
@@ -369,61 +382,96 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     }
   }, [])
 
+  /** 点击切换：开始 / 停止录音 */
+  const toggleRecording = useCallback(async (): Promise<void> => {
+    if (recordingRef.current) {
+      stopRecording()
+      return
+    }
+    await startRecording()
+  }, [])
+
   const startRecording = useCallback(async (): Promise<void> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const rec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
-      chunksRef.current = []
+      streamRef.current = stream
+      // 通道1：完整录音（不分块，stop 后是合法完整 webm，用于最终识别）
+      const recFull = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      fullChunksRef.current = []
+      recFull.ondataavailable = (e) => {
+        if (e.data.size > 0) fullChunksRef.current.push(e.data)
+      }
+      recFullRef.current = recFull
+      // 通道2：分块录音（每 2s 一块，用于实时预览识别）
+      const recLive = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
       pendingChunksRef.current = []
-      setLiveText('')
-      // 每 2.5s 产出一块音频 → 立即增量识别（边说边出字）
-      rec.ondataavailable = (e) => {
+      recLive.ondataavailable = (e) => {
         if (e.data.size > 0) {
-          chunksRef.current.push(e.data)
           pendingChunksRef.current.push(e.data)
           void transcribeChunk()
         }
       }
-      rec.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop())
-        void (async () => {
-          // 等增量识别队列清空
-          while (processingRef.current || pendingChunksRef.current.length > 0) {
-            await new Promise((r) => setTimeout(r, 200))
-          }
-          setTranscribing(true)
-          try {
-            // 全量音频最终识别，保证完整准确
-            const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-            const buf = new Uint8Array(await blob.arrayBuffer())
-            const r: TranscribeResult = await window.api.transcribeAudio(arrayBufferToBase64(buf))
-            if (r.ok && r.text) {
-              await sendUser(r.text)
-            } else if (liveText) {
-              await sendUser(liveText)
-            } else if (!r.ok) {
-              setError(r.error ?? '识别失败')
-            }
-            setLiveText('')
-          } finally {
-            setTranscribing(false)
-          }
-        })()
-      }
-      rec.start(2500)
-      recorderRef.current = rec
+      recLiveRef.current = recLive
+
+      setLiveText('')
+      recFull.start()
+      recLive.start(2000)
+      recordingRef.current = true
+      recStartRef.current = Date.now()
       setRecording(true)
+      setRecSeconds(0)
     } catch (e) {
       setError(`无法录音：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [sendUser, transcribeChunk])
+  }, [transcribeChunk])
 
+  /** 停止录音并发送识别结果 */
   const stopRecording = useCallback((): void => {
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-      recorderRef.current.stop()
-    }
+    if (!recordingRef.current) return
+    recordingRef.current = false
     setRecording(false)
-  }, [])
+    // 停止两个录音器（触发各自的 ondataavailable / onstop）
+    try {
+      recLiveRef.current?.stop()
+      recFullRef.current?.stop()
+    } catch {
+      /* ignore */
+    }
+
+    const durationSec = Math.round((Date.now() - recStartRef.current) / 1000)
+    void (async () => {
+      // 等实时预览识别队列清空
+      while (processingRef.current || pendingChunksRef.current.length > 0) {
+        await new Promise((r) => setTimeout(r, 200))
+      }
+      // 释放麦克风
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      setTranscribing(true)
+      try {
+        const live = liveText.trim()
+        // 长录音（>25s）直接用实时拼接文本，避免全量识别耗时过长
+        if (durationSec > 25 && live) {
+          await sendUser(live)
+        } else {
+          // 完整录音最终识别（单次录制，webm 合法，识别最准）
+          const blob = new Blob(fullChunksRef.current, { type: 'audio/webm' })
+          const buf = new Uint8Array(await blob.arrayBuffer())
+          const r: TranscribeResult = await window.api.transcribeAudio(arrayBufferToBase64(buf))
+          if (r.ok && r.text) {
+            await sendUser(r.text)
+          } else if (live) {
+            await sendUser(live)
+          } else if (!r.ok) {
+            setError(r.error ?? '识别失败')
+          }
+        }
+        setLiveText('')
+      } finally {
+        setTranscribing(false)
+      }
+    })()
+  }, [sendUser])
+
 
   if (!settings || !style) return <div className="page-loading">加载中…</div>
 
@@ -654,12 +702,10 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
       <div className="chat-input">
         <button
           className={`btn ${recording ? 'danger' : 'primary'} record-btn`}
-          onPointerDown={() => void startRecording()}
-          onPointerUp={stopRecording}
-          onPointerLeave={recording ? stopRecording : undefined}
+          onClick={() => void toggleRecording()}
           disabled={transcribing || thinking}
         >
-          {recording ? '🔴 松开结束' : transcribing ? '识别中…' : '🎤 按住说话'}
+          {recording ? `🔴 停止录音（${recSeconds}s）` : transcribing ? '识别中…' : '🎤 开始说话'}
         </button>
         <input
           ref={textInputRef}

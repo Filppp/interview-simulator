@@ -365,7 +365,7 @@ export async function transcribeAudio(
   try {
     const audioDir = path.join(dataRoot(), 'audio')
     mkdirSync(audioDir, { recursive: true })
-    const file = path.join(audioDir, `rec-${Date.now()}.webm`)
+    const file = path.join(audioDir, `rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webm`)
     await fs.writeFile(file, Buffer.from(webmBase64, 'base64'))
     const result = await getWorker().transcribe(file, language)
     await fs.unlink(file).catch(() => {})
