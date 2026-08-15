@@ -1,5 +1,20 @@
 /** 主进程与渲染进程共享的类型定义 */
 
+/* ---------- AI 服务商（多模型/多模态） ---------- */
+
+export interface ProviderConfig {
+  id: string
+  /** 显示名，如 DeepSeek / 通义千问 / OpenAI */
+  name: string
+  /** OpenAI 兼容 API 地址 */
+  baseUrl: string
+  /** 模型名，如 deepseek-chat / qwen-vl-max / gpt-4o */
+  model: string
+  apiKey: string
+  /** 是否支持图片输入（多模态） */
+  vision: boolean
+}
+
 export interface InterviewSettings {
   /** DeepSeek API Key（仅保存在本机） */
   apiKey: string
@@ -29,6 +44,10 @@ export interface InterviewSettings {
   ttsSpeed: number
   /** 面试官风格 */
   style: InterviewStyle
+  /** 服务商列表（多模型/多模态） */
+  providers: ProviderConfig[]
+  /** 当前使用的服务商 id（空则用第一个） */
+  activeProviderId: string
 }
 
 
@@ -157,6 +176,8 @@ export type InterviewStage = 'intro' | 'english' | 'major' | 'resume'
 export interface ChatMessage {
   role: 'assistant' | 'user'
   content: string
+  /** 随消息发送的图片（data URL，多模态模型使用） */
+  images?: string[]
 }
 
 export type AskIntent = 'question' | 'answer' | 'hint' | 'skip' | 'introFollowup'

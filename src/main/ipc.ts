@@ -36,7 +36,7 @@ export function registerIpc(): void {
 
   ipcMain.handle('settings:set', (_e, partial: Partial<InterviewSettings>) => saveSettings(partial))
 
-  ipcMain.handle('settings:testApi', (_e, keyOverride?: string) => testApiKey(keyOverride))
+  ipcMain.handle('settings:testApi', () => testApiKey())
 
   ipcMain.handle('mic:status', () => getMicStatus())
 
@@ -72,9 +72,10 @@ export function registerIpc(): void {
       title: '选择要导入的资料文件',
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: '资料文件', extensions: ['pdf', 'docx'] },
+        { name: '资料文件', extensions: ['pdf', 'docx', 'md', 'txt'] },
         { name: 'PDF', extensions: ['pdf'] },
-        { name: 'Word', extensions: ['docx'] }
+        { name: 'Word', extensions: ['docx'] },
+        { name: 'Markdown / 文本', extensions: ['md', 'txt'] }
       ]
     })
     if (result.canceled || result.filePaths.length === 0) return []

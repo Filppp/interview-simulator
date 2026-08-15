@@ -5,8 +5,18 @@ import type {
   AsrStatus,
   InterviewSettings,
   MicStatus,
+  ProviderConfig,
   TranscribeResult
 } from '../../../shared/types'
+
+const PROVIDER_PRESETS: Array<{ id: string; name: string; baseUrl: string; model: string; vision: boolean }> = [
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', vision: false },
+  { id: 'qwen', name: '通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-vl-max', vision: true },
+  { id: 'zhipu', name: '智谱 GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4v-plus', vision: true },
+  { id: 'kimi', name: 'Kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', vision: false },
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', vision: true },
+  { id: 'ollama', name: '本地 Ollama', baseUrl: 'http://localhost:11434/v1', model: 'qwen2.5:7b', vision: false }
+]
 
 const ZH_VOICES = [
   { id: 'zh-CN-XiaoxiaoNeural', label: '晓晓（女声，自然）' },
@@ -54,6 +64,9 @@ export default function Settings(): React.JSX.Element {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
+  // 服务商编辑
+  const [editingProvider, setEditingProvider] = useState<ProviderConfig | null>(null)
+  const [providerErr, setProviderErr] = useState<string | null>(null)
   // 语音识别状态
   const [asrStatus, setAsrStatus] = useState<AsrStatus | null>(null)
   const [asrProgress, setAsrProgress] = useState<AsrProgress | null>(null)
@@ -115,12 +128,61 @@ export default function Settings(): React.JSX.Element {
     setTesting(true)
     setTestResult(null)
     try {
-      setTestResult(await window.api.testApiKey(settings.apiKey))
+      setTestResult(await window.api.testApiKey())
     } finally {
       setTesting(false)
     }
   }
 
+  /* ---------- 服务商管理 ---------- */
+  const startAddProvider = (): void => {
+    setProviderErr(null)
+    setEditingProvider({
+      id: `p-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name: '',
+      baseUrl: '',
+      model: '',
+      apiKey: '',
+      vision: false
+    })
+  }
+  const startEditProvider = (p: ProviderConfig): void => {
+    setProviderErr(null)
+    setEditingProvider({ ...p })
+  }
+  const applyPreset = (presetId: string): void => {
+    const preset = PROVIDER_PRESETS.find((x) => x.id === presetId)
+    if (preset && editingProvider) {
+      setEditingProvider({ ...editingProvider, name: preset.name, baseUrl: preset.baseUrl, model: preset.model, vision: preset.vision })
+    }
+  }
+  const saveProvider = (): void => {
+    if (!editingProvider || !settings) return
+    if (!editingProvider.name.trim() || !editingProvider.baseUrl.trim() || !editingProvider.model.trim()) {
+      setProviderErr('请填写名称、API 地址和模型')
+      return
+    }
+    const list = settings.providers ?? []
+    const idx = list.findIndex((x) => x.id === editingProvider.id)
+    const nextList = idx >= 0 ? list.map((x) => (x.id === editingProvider.id ? editingProvider : x)) : [...list, editingProvider]
+    const active = settings.activeProviderId || (nextList.length === 1 ? editingProvider.id : settings.activeProviderId)
+    update({ providers: nextList, activeProviderId: active })
+    setEditingProvider(null)
+  }
+  const removeProvider = (id: string): void => {
+    if (!settings) return
+    const list = (settings.providers ?? []).filter((x) => x.id !== id)
+    let active = settings.activeProviderId
+    if (active === id) active = list.length > 0 ? list[0].id : ''
+    if (editingProvider?.id === id) setEditingProvider(null)
+    update({ providers: list, activeProviderId: active })
+  }
+  const setActiveProvider = (id: string): void => {
+    update({ activeProviderId: id })
+  }
+  const patchEditing = (patch: Partial<ProviderConfig>): void => {
+    setEditingProvider((p) => (p ? { ...p, ...patch } : p))
+  }
   const handleRequestMic = async (): Promise<void> => {
     setMicStatus(await window.api.requestMic())
   }
@@ -230,36 +292,101 @@ export default function Settings(): React.JSX.Element {
       </header>
 
       <section className="card">
-        <h2 className="card-title">🤖 AI 面试官（DeepSeek）</h2>
-        <div className="form-row">
-          <label>API Key</label>
-          <input
-            type="password"
-            value={settings.apiKey}
-            placeholder="sk-..."
-            onChange={(e) => update({ apiKey: e.target.value })}
-          />
-        </div>
-        <div className="form-row">
-          <label>API 地址</label>
-          <input value={settings.apiBaseUrl} onChange={(e) => update({ apiBaseUrl: e.target.value })} />
-        </div>
-        <div className="form-row">
-          <label>模型</label>
-          <input value={settings.model} onChange={(e) => update({ model: e.target.value })} />
-        </div>
-        <div className="form-row">
-          <label>连通性测试</label>
-          <div className="inline-actions">
+        <h2 className="card-title">🤖 AI 服务商（支持多个模型 / 多模态看图）</h2>
+        <div className="cat-bar">
+          <strong>服务商列表（{settings.providers?.length ?? 0}）</strong>
+          <div className="cat-actions">
+            <button className="btn primary" onClick={startAddProvider}>＋ 新增服务商</button>
             <button className="btn" onClick={() => void handleTest()} disabled={testing}>
-              {testing ? '测试中…' : '测试连接'}
+              {testing ? '测试中…' : '🔌 测试当前服务商'}
             </button>
-            {testResult && (
-              <span className={`test-result ${testResult.ok ? 'ok' : 'bad'}`}>{testResult.message}</span>
-            )}
           </div>
         </div>
-        <p className="hint">Key 仅保存在本机 settings.json，不会上传。没有 Key 请到 platform.deepseek.com 注册获取。</p>
+        {testResult && (
+          <p className={`hint ${testResult.ok ? 'ok-text' : 'bad-text'}`}>{testResult.message}</p>
+        )}
+
+        {(settings.providers ?? []).length === 0 && !editingProvider ? (
+          <div className="empty">
+            <div className="empty-icon">🤖</div>
+            <p>还没有配置 AI 服务商</p>
+            <p className="empty-sub">点击「新增服务商」，可选 DeepSeek / 通义 / OpenAI / 本地 Ollama 等（支持多模态看图）</p>
+          </div>
+        ) : (
+          <ul className="material-list">
+            {(settings.providers ?? []).map((p) => (
+              <li key={p.id} className={`material-item${settings.activeProviderId === p.id ? ' selected' : ''}`}>
+                <div className="material-icon">{p.vision ? '🖼️' : '🤖'}</div>
+                <div className="material-info" onClick={() => setActiveProvider(p.id)}>
+                  <div className="material-name">
+                    {p.name} · {p.model}
+                    {p.vision && <span className="count-badge" style={{ marginLeft: 8 }}>多模态</span>}
+                    {settings.activeProviderId === p.id && <span className="count-badge" style={{ marginLeft: 6, color: 'var(--accent)' }}>当前</span>}
+                  </div>
+                  <div className="material-meta">
+                    <span>{p.baseUrl}</span>
+                    <span>{p.apiKey ? 'Key 已填' : '未填 Key'}</span>
+                  </div>
+                </div>
+                <div className="material-actions">
+                  <button className="btn small" onClick={() => startEditProvider(p)}>编辑</button>
+                  <button className="btn small danger" onClick={() => removeProvider(p.id)}>删除</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {editingProvider && (
+          <div className="provider-form">
+            <div className="cat-bar">
+              <strong>{editingProvider.id.includes('p-') && !(settings.providers ?? []).some((x) => x.id === editingProvider.id) ? '➕ 新增服务商' : '✏️ 编辑服务商'}</strong>
+            </div>
+            <div className="form-row">
+              <label>快速模板</label>
+              <select
+                value=""
+                onChange={(e) => e.target.value && applyPreset(e.target.value)}
+              >
+                <option value="">选择预设自动填入…</option>
+                {PROVIDER_PRESETS.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}（{x.model}{x.vision ? ' · 多模态' : ''}）
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-row">
+              <label>名称</label>
+              <input value={editingProvider.name} placeholder="如：DeepSeek" onChange={(e) => patchEditing({ name: e.target.value })} />
+            </div>
+            <div className="form-row">
+              <label>API 地址</label>
+              <input value={editingProvider.baseUrl} placeholder="https://api.deepseek.com" onChange={(e) => patchEditing({ baseUrl: e.target.value })} />
+            </div>
+            <div className="form-row">
+              <label>模型</label>
+              <input value={editingProvider.model} placeholder="deepseek-chat" onChange={(e) => patchEditing({ model: e.target.value })} />
+            </div>
+            <div className="form-row">
+              <label>API Key</label>
+              <input type="password" value={editingProvider.apiKey} placeholder="sk-..." onChange={(e) => patchEditing({ apiKey: e.target.value })} />
+            </div>
+            <label className="checkbox-row">
+              <input type="checkbox" checked={editingProvider.vision} onChange={(e) => patchEditing({ vision: e.target.checked })} />
+              支持多模态（可发送图片给 AI 看图）
+            </label>
+            {providerErr && <div className="err-banner">⚠️ {providerErr}</div>}
+            <div className="inline-actions" style={{ marginTop: 10 }}>
+              <button className="btn primary" onClick={saveProvider}>保存</button>
+              <button className="btn" onClick={() => setEditingProvider(null)}>取消</button>
+            </div>
+          </div>
+        )}
+        <p className="hint">
+          可配置多个服务商，点选切换当前使用；API Key 仅保存在本机。
+          多模态模型（如通义 qwen-vl、智谱 glm-4v、GPT-4o）可在面试中发送图片让面试官看图点评。
+        </p>
       </section>
 
       <section className="card">

@@ -92,6 +92,8 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
   const [transcribing, setTranscribing] = useState(false)
   const [liveText, setLiveText] = useState('')
   const [recSeconds, setRecSeconds] = useState(0)
+  const [pendingImages, setPendingImages] = useState<string[]>([])
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
   const stage = STAGES[stageIdx].key
 
   useEffect(() => {
@@ -109,15 +111,19 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     }
   }, [messages, thinking])
 
-  // 计时器
+  // 计时器（总用时 + 自我介绍倒计时）
   useEffect(() => {
     if (phase !== 'running') return
-    timerRef.current = setInterval(() => {
+    const iv = setInterval(() => {
+      // 全局总用时（自我介绍完毕、换环节后持续走）
+      setElapsed(Math.floor((Date.now() - sessionStart.current) / 1000))
+      // 自我介绍倒计时（仅 intro 阶段）
       if (stage === 'intro' && settings) {
         const remain = Math.max(0, settings.introSeconds - Math.floor((Date.now() - stageStart.current) / 1000))
         setIntroCountdown(remain)
       }
     }, 1000)
+    timerRef.current = iv
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
@@ -136,8 +142,11 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     setMessages((m) => [...m, { role: 'assistant', content }])
   }, [])
 
-  const appendUser = useCallback((content: string): void => {
-    setMessages((m) => [...m, { role: 'user', content }])
+  const appendUser = useCallback((msg: { content: string; images?: string[] }): void => {
+    setMessages((m) => [
+      ...m,
+      { role: 'user', content: msg.content, images: msg.images && msg.images.length > 0 ? msg.images : undefined }
+    ])
   }, [])
 
   /** 加载某分类资料文本 */
@@ -242,12 +251,13 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     })()
   }, [stageIdx, settings, style, appendAssistant, speak])
 
-  /** 发送用户消息 */
+  /** 发送用户消息（可附带图片） */
   const sendUser = useCallback(
-    async (text: string): Promise<void> => {
+    async (text: string, images?: string[]): Promise<void> => {
       const trimmed = text.trim()
-      if (!trimmed || thinking) return
-      appendUser(trimmed)
+      const imgs = images?.filter((i) => i && i.startsWith('data:image')) ?? []
+      if ((!trimmed && imgs.length === 0) || thinking) return
+      appendUser({ content: trimmed, images: imgs.length > 0 ? imgs : undefined })
 
       if (stage === 'intro') {
         // 自我介绍阶段：点过"完毕"后，追问回答要触发 AI 回应
@@ -265,6 +275,24 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
     },
     [stage, thinking, appendUser, ask]
   )
+
+  /** 选择图片（多模态：让面试官看图） */
+  const pickImages = useCallback(async (files: FileList | null): Promise<void> => {
+    if (!files || files.length === 0) return
+    const imgs: string[] = []
+    for (const f of Array.from(files).slice(0, 3)) {
+      if (!f.type.startsWith('image/')) continue
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader()
+        fr.onload = () => resolve(String(fr.result))
+        fr.onerror = reject
+        fr.readAsDataURL(f)
+      })
+      imgs.push(dataUrl)
+    }
+    if (imgs.length > 0) setPendingImages((prev) => [...prev, ...imgs])
+    if (imageInputRef.current) imageInputRef.current.value = ''
+  }, [])
 
   const handleIntroDone = useCallback((): void => {
     introAnswered.current = true
@@ -709,22 +737,46 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
             if (e.key === 'Enter') {
               const v = textInputRef.current?.value ?? ''
               textInputRef.current!.value = ''
-              void sendUser(v)
+              void sendUser(v, pendingImages)
+              setPendingImages([])
             }
           }}
         />
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => void pickImages(e.target.files)}
+        />
+        <button className="btn" onClick={() => imageInputRef.current?.click()} disabled={thinking} title="发送图片给面试官看（需多模态模型）">
+          🖼️
+        </button>
         <button
           className="btn"
           onClick={() => {
             const v = textInputRef.current?.value ?? ''
             textInputRef.current!.value = ''
-            void sendUser(v)
+            void sendUser(v, pendingImages)
+            setPendingImages([])
           }}
           disabled={thinking}
         >
           发送
         </button>
       </div>
+      {pendingImages.length > 0 && (
+        <div className="img-preview">
+          {pendingImages.map((img, i) => (
+            <div className="img-thumb" key={i}>
+              <img src={img} alt={`图${i + 1}`} />
+              <button className="img-remove" onClick={() => setPendingImages((prev) => prev.filter((_, j) => j !== i))}>×</button>
+            </div>
+          ))}
+          <span className="hint" style={{ margin: 0 }}>发送时将附带图片给面试官</span>
+        </div>
+      )}
       {recording && liveText && (
         <div className="live-text">🎙️ 实时识别：{liveText}</div>
       )}

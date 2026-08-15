@@ -23,7 +23,9 @@ export const DEFAULT_SETTINGS: InterviewSettings = {
     englishDifficulty: 3,
     pressureLevel: 2,
     customNote: ''
-  }
+  },
+  providers: [],
+  activeProviderId: ''
 }
 
 /** 应用数据根目录（资料、录音、历史、模型等） */
@@ -44,12 +46,36 @@ export function ensureDataDirs(): void {
 }
 
 export async function loadSettings(): Promise<InterviewSettings> {
+  let s: InterviewSettings
   try {
     const raw = await fs.readFile(settingsFile(), 'utf-8')
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<InterviewSettings>) }
+    s = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<InterviewSettings>) }
   } catch {
-    return { ...DEFAULT_SETTINGS }
+    s = { ...DEFAULT_SETTINGS }
   }
+  // 迁移：旧版只有 apiKey/apiBaseUrl/model → 生成默认服务商
+  if (!s.providers || s.providers.length === 0) {
+    if (s.apiKey) {
+      s.providers = [{ id: 'default', name: 'DeepSeek', baseUrl: s.apiBaseUrl, model: s.model, apiKey: s.apiKey, vision: false }]
+      s.activeProviderId = 'default'
+    } else {
+      s.providers = []
+      s.activeProviderId = ''
+    }
+  }
+  return s
+}
+
+/** 当前使用的服务商（无则返回空，调用方报错提示配置） */
+export function getActiveProvider(s: InterviewSettings): { id: string; name: string; baseUrl: string; model: string; apiKey: string; vision: boolean } | null {
+  if (s.providers && s.providers.length > 0) {
+    const p = s.providers.find((x) => x.id === s.activeProviderId) ?? s.providers[0]
+    if (p) return { id: p.id, name: p.name, baseUrl: p.baseUrl, model: p.model, apiKey: p.apiKey, vision: !!p.vision }
+  }
+  if (s.apiKey) {
+    return { id: 'default', name: 'DeepSeek', baseUrl: s.apiBaseUrl, model: s.model, apiKey: s.apiKey, vision: false }
+  }
+  return null
 }
 
 /** 合并保存设置，原子写入（写临时文件再 rename） */

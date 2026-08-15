@@ -80,7 +80,7 @@ export default function Library(): React.JSX.Element {
     <div className="page">
       <header className="page-header">
         <h1>资料库</h1>
-        <p>导入并管理英语资料、专业课资料与简历（支持 PDF / Word），面试时将基于这些内容出题</p>
+        <p>导入并管理英语资料、专业课资料与简历（支持 PDF / Word / Markdown / TXT），面试时将基于这些内容出题</p>
       </header>
 
       <div className="cat-tabs">
@@ -119,7 +119,7 @@ export default function Library(): React.JSX.Element {
             <div className="empty-icon">📭</div>
             <p>该分类下还没有资料</p>
             <p className="empty-sub">
-              点击「导入文件」选择 PDF / Word（可多选）。
+              点击「导入文件」选择 PDF / Word / MD / TXT（可多选）。
               {active === 'resume' && '建议只导入一份最新简历。'}
             </p>
           </div>

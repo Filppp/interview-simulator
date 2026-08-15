@@ -23,7 +23,7 @@ declare global {
     api: {
       getSettings(): Promise<InterviewSettings>
       saveSettings(partial: Partial<InterviewSettings>): Promise<InterviewSettings>
-      testApiKey(keyOverride?: string): Promise<ApiTestResult>
+      testApiKey(): Promise<ApiTestResult>
       getMicStatus(): Promise<MicStatus>
       requestMic(): Promise<MicStatus>
       getAppInfo(): Promise<AppInfo>
