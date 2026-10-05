@@ -10,6 +10,9 @@ out/
 *.blockmap
 build/icon.iconset/
 
+# 可选：随包分发的内置 Python 运行时 / Whisper 模型（体积大，不入库）
+vendor/
+
 # 环境变量 / 密钥（本项目不使用，保险起见忽略）
 .env
 .env.*

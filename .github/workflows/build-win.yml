@@ -1,0 +1,66 @@
+name: 构建 Windows 版
+
+# 为什么必须在 Windows 上构建（而不是在 macOS 上交叉编译）：
+#   pdf-parse 依赖原生模块 @napi-rs/canvas，npm 只会安装「当前平台」的二进制。
+#   在 macOS 上 npm install 只会拿到 canvas-darwin-arm64，
+#   交叉编译出的 Windows 包里缺少 canvas-win32-x64-msvc，用户导入 PDF 会直接崩。
+#   因此必须在 windows x64 runner/机器上执行 npm install + 打包。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    env:
+      # .npmrc 里的 electron_mirror（npmmirror 国内镜像）优先级高于 ELECTRON_MIRROR 环境变量，
+      # 在海外 runner 上会拖慢甚至失败，这里显式覆盖为官方源。
+      npm_config_electron_mirror: https://github.com/electron/electron/releases/download/
+      # 无代码签名证书：不尝试签名（否则 electron-builder 会去找证书并报错）
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 打包（nsis 安装包 + portable 免安装版）
+        run: npm run build:win
+
+      # 直接守住前面提到的那个坑：产包里必须存在 win32 原生模块
+      - name: 校验 Windows 原生模块已打进去
+        shell: pwsh
+        run: |
+          $root = "dist/win-unpacked/resources/app.asar.unpacked/node_modules"
+          if (-not (Test-Path $root)) { throw "未找到 unpacked 目录：$root" }
+          $canvas = Get-ChildItem -Path $root -Recurse -Filter "canvas-win32*.node" -ErrorAction SilentlyContinue
+          if (-not $canvas) {
+            throw "缺少 @napi-rs/canvas-win32-x64-msvc 原生模块，PDF 导入会失败"
+          }
+          $canvas | ForEach-Object { Write-Host "OK -> $($_.FullName)" }
+
+      - name: 列出产物
+        shell: pwsh
+        run: Get-ChildItem dist -Filter *.exe | Select-Object Name, @{N='MB';E={[math]::Round($_.Length/1MB,1)}}
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: interview-simulator-windows
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml

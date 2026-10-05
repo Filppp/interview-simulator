@@ -198,8 +198,9 @@ export interface AskPayload {
   schoolNotes: string
   /** 自我介绍原文（resume 阶段提问依据之一） */
   selfIntro?: string
+  /** 自我介绍时长（秒）：由设置传入，避免面试官提示词里写死时长 */
+  introSeconds: number
 }
-
 export interface InterviewConfig {
   schoolId: string | null
   style: InterviewStyle

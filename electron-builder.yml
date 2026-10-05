@@ -8,6 +8,19 @@ files:
   - package.json
 asar: true
 npmRebuild: false
+
+# 可选：把内置 Python 运行时随包分发，用户机器上就无需自行安装 Python。
+# 准备方式：解压 python-build-standalone 的 x86_64-pc-windows-msvc 包到 vendor/python，
+# 使 vendor/python/python.exe 存在，然后取消下面的注释。
+# extraResources:
+#   - from: vendor/python
+#     to: python
+#
+# 可选：把 Whisper 模型也随包分发（免首次下载 464MB，代价是安装包变大）。
+# extraResources:
+#   - from: vendor/models/whisper-small
+#     to: models/whisper-small
+
 mac:
   target:
     - dmg
@@ -15,6 +28,7 @@ mac:
   icon: build/icon.icns
   # 无开发者证书：不签名（首次打开需右键→打开）
   identity: null
+
 dmg:
   title: 面试模拟器
   icon: build/icon.icns
@@ -25,3 +39,25 @@ dmg:
       y: 220
       type: link
       path: /Applications
+
+win:
+  target:
+    - nsis
+    - portable
+  icon: build/icon.ico
+  # 中文产品名会让安装目录/可执行文件带中文，个别环境下会乱码，故 exe 名用 ASCII
+  executableName: InterviewSimulator
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 面试模拟器
+  # 卸载时保留 %APPDATA%\interview-simulator（资料/模型/历史），避免误删用户数据
+  deleteAppDataOnUninstall: false
+  artifactName: InterviewSimulator-${version}-setup.${ext}
+
+portable:
+  artifactName: InterviewSimulator-${version}-portable.${ext}

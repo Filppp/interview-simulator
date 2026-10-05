@@ -1,3 +1,4 @@
+import { micErrorMessage } from '../lib/micErrorMessage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   AskIntent,
@@ -10,8 +11,12 @@ import type {
   StylePreset,
   TranscribeResult
 } from '../../../shared/types'
+import { fmtDurationZh } from '../../../shared/format'
 
 type Phase = 'setup' | 'running' | 'done'
+
+/** 设置尚未加载时的兜底自我介绍时长（秒），与 store.ts 的 DEFAULT_SETTINGS 一致 */
+const FALLBACK_INTRO_SECONDS = 150
 
 const STAGES: Array<{ key: InterviewStage; label: string; icon: string }> = [
   { key: 'intro', label: '自我介绍', icon: '🗣️' },
@@ -189,7 +194,8 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
           stageContext: stageContexts.current[stage],
           style,
           schoolNotes: schoolNotes.current,
-          selfIntro: selfIntro.current
+          selfIntro: selfIntro.current,
+          introSeconds: settings?.introSeconds ?? FALLBACK_INTRO_SECONDS
         }
         const reply = await window.api.askInterviewer(payload)
         appendAssistant(reply)
@@ -238,7 +244,8 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
           stageContext: stageContexts.current[STAGES[next].key],
           style: style!,
           schoolNotes: schoolNotes.current,
-          selfIntro: selfIntro.current
+          selfIntro: selfIntro.current,
+          introSeconds: settings?.introSeconds ?? FALLBACK_INTRO_SECONDS
         }
         const reply = await window.api.askInterviewer(payload)
         appendAssistant(reply)
@@ -309,7 +316,8 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
           stageContext: '',
           style: style!,
           schoolNotes: schoolNotes.current,
-          selfIntro: selfIntro.current
+          selfIntro: selfIntro.current,
+          introSeconds: settings?.introSeconds ?? FALLBACK_INTRO_SECONDS
         }
         const reply = await window.api.askInterviewer(payload)
         appendAssistant(reply)
@@ -319,7 +327,7 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
         setThinking(false)
       }
     })()
-  }, [messages, style, appendAssistant])
+  }, [messages, style, appendAssistant, settings])
 
   const handleHint = useCallback((): void => {
     void ask('hint')
@@ -444,7 +452,7 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
       setRecording(true)
       setRecSeconds(0)
     } catch (e) {
-      setError(`无法录音：${e instanceof Error ? e.message : String(e)}`)
+      setError(micErrorMessage(e))
     }
   }, [transcribeAll])
 
@@ -595,7 +603,7 @@ export default function Interview({ onReportReady }: { onReportReady: (id: strin
               🚀 开始面试
             </button>
             <span className="hint" style={{ margin: 0 }}>
-              共 4 个环节 · 自我介绍 {Math.round(settings.introSeconds / 60)} 分钟 · 英语 {settings.englishQuestions} 题 · 专业课{' '}
+              共 4 个环节 · 自我介绍 {fmtDurationZh(settings.introSeconds)} · 英语 {settings.englishQuestions} 题 · 专业课{' '}
               {settings.majorQuestions} 题 · 简历 {settings.resumeQuestions} 题
             </span>
           </div>

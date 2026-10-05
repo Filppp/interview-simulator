@@ -1,4 +1,5 @@
 import { chatCompletion } from './llm'
+import { fmtDurationZh } from '../shared/format'
 import type { AskPayload, ChatMessage, InterviewStyle, InterviewStage } from '../shared/types'
 
 const PRESET_DESC: Record<InterviewStyle['preset'], string> = {
@@ -42,7 +43,7 @@ function stageRules(stage: InterviewStage, payload: AskPayload): string {
   rules.push(ctx ? `【本环节可用资料】\n"""\n${ctx}\n"""\n出题与追问应尽量结合以上资料；资料不足时出通用问题。` : '（本环节没有可用的资料，请出通用问题）')
   switch (stage) {
     case 'intro':
-      rules.push('面试开始，请用一两句话自然开场，然后请考生做自我介绍（时长约 150 秒）。')
+      rules.push(`面试开始，请用一两句话自然开场，然后请考生做自我介绍（时长约 ${fmtDurationZh(payload.introSeconds)}）。`)
       rules.push(`intent=${intent}：`)
       rules.push('- question：发出自我介绍邀请（不要替考生介绍）。')
       rules.push('- answer：考生自我介绍已结束，请基于其内容简短点评，然后追问 1 个相关问题（如项目细节/为什么选这个方向）。')

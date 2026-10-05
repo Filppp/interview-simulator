@@ -1,3 +1,4 @@
+import { micErrorMessage } from '../lib/micErrorMessage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   AppInfo,
@@ -267,7 +268,7 @@ export default function Settings(): React.JSX.Element {
         text: '',
         language: null,
         duration: 0,
-        error: `无法录音：${e instanceof Error ? e.message : String(e)}`
+        error: micErrorMessage(e)
       })
     }
   }

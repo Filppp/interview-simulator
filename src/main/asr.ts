@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { promises as fs, existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 import { dataRoot } from './store'
 import {
   MODEL_NAME,
@@ -16,12 +17,70 @@ const VENV_NAME = 'venv-whisper'
 const WORKER_NAME = 'whisper-worker.py'
 const PIP_MIRROR = 'https://pypi.tuna.tsinghua.edu.cn/simple'
 
+/** 平台差异：Windows 的 venv 解释器在 Scripts\python.exe，POSIX 在 bin/python */
+const IS_WIN = process.platform === 'win32'
+
+/** Python 子进程统一环境：强制 UTF-8，避免 Windows 默认代码页（cp936）搞乱中文路径/输出 */
+function pyEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1', PYTHONUNBUFFERED: '1' }
+}
+
+/** 随应用分发的内置 Python（可选，见 electron-builder.yml 的 extraResources）；未内置则返回空串 */
+function bundledPython(): string {
+  try {
+    return path.join(process.resourcesPath, 'python', IS_WIN ? 'python.exe' : 'bin/python3')
+  } catch {
+    return ''
+  }
+}
+
 function venvDir(): string {
   return path.join(dataRoot(), VENV_NAME)
 }
 
+/** 识别引擎虚拟环境里的解释器路径 */
 function pythonBin(): string {
-  return path.join(venvDir(), 'bin', 'python')
+  return IS_WIN
+    ? path.join(venvDir(), 'Scripts', 'python.exe')
+    : path.join(venvDir(), 'bin', 'python')
+}
+
+/** Whisper 推理线程数：按 CPU 核心数自适应（弱机开太多反而更慢） */
+function whisperThreads(): number {
+  return Math.max(2, Math.min(8, os.cpus()?.length ?? 4))
+}
+
+/**
+ * 探测可用于创建 venv 的 Python 3.9+ 解释器。
+ * 顺序：内置运行时 → Windows 的 py 启动器（可绕开 Microsoft Store 的 python3 别名）→ python3 → python
+ */
+async function detectSystemPython(): Promise<{ cmd: string; args: string[] }> {
+  const probe = ['-c', 'import sys;print("%d.%d" % sys.version_info[:2])']
+  const candidates: Array<{ cmd: string; args: string[] }> = []
+
+  const bundled = bundledPython()
+  if (bundled && existsSync(bundled)) candidates.push({ cmd: bundled, args: [] })
+  if (IS_WIN) {
+    candidates.push({ cmd: 'py', args: ['-3'] }, { cmd: 'python', args: [] })
+  } else {
+    candidates.push({ cmd: 'python3', args: [] }, { cmd: 'python', args: [] })
+  }
+
+  const tried: string[] = []
+  for (const c of candidates) {
+    try {
+      const { stdout } = await execCapture(c.cmd, [...c.args, ...probe])
+      const [maj, min] = stdout.trim().split('.').map((n) => Number.parseInt(n, 10))
+      if (maj === 3 && min >= 9) return c
+      tried.push(`${c.cmd}（版本 ${stdout.trim()} 过低，需 3.9+）`)
+    } catch {
+      tried.push(`${c.cmd}（不可用）`)
+    }
+  }
+
+  throw new Error(
+    `未找到可用的 Python 3.9+。请安装 Python 并勾选「Add Python to PATH」。已尝试：${tried.join('、')}`
+  )
 }
 
 function workerFile(): string {
@@ -111,9 +170,11 @@ class WhisperWorker {
         return
       }
       mkdirSync(dataRoot(), { recursive: true })
-      const proc = spawn(pythonBin(), [workerFile(), '--model', modelDir()], {
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
-      })
+      const proc = spawn(
+        pythonBin(),
+        ['-u', workerFile(), '--model', modelDir(), '--threads', String(whisperThreads())],
+        { env: pyEnv() }
+      )
       this.proc = proc
       let started = false
 
@@ -267,8 +328,15 @@ export async function setupEngine(onProgress: (p: AsrProgress) => void): Promise
   mkdirSync(root, { recursive: true })
 
   if (!existsSync(pythonBin())) {
-    onProgress({ phase: 'venv', message: '正在创建 Python 虚拟环境…', done: 0, total: 0, speedBps: 0 })
-    await runProcess('python3', ['-m', 'venv', venvDir()])
+    const py = await detectSystemPython()
+    onProgress({
+      phase: 'venv',
+      message: `正在创建 Python 虚拟环境（${py.cmd}）…`,
+      done: 0,
+      total: 0,
+      speedBps: 0
+    })
+    await runProcess(py.cmd, [...py.args, '-m', 'venv', venvDir()])
   }
 
   // 写入 worker 脚本
@@ -277,7 +345,7 @@ export async function setupEngine(onProgress: (p: AsrProgress) => void): Promise
   // 检查 faster-whisper 是否已装
   const installed = await checkImport()
   if (!installed) {
-    onProgress({ phase: 'pip', message: '正在安装 faster-whisper（约 100MB，请稍候）…', done: 0, total: 0, speedBps: 0 })
+    onProgress({ phase: 'pip', message: '正在安装 faster-whisper（约 300MB，视网络 3-10 分钟）…', done: 0, total: 0, speedBps: 0 })
     await runProcess(
       pythonBin(),
       ['-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--index-url', PIP_MIRROR, 'faster-whisper']
@@ -323,7 +391,7 @@ async function checkImport(): Promise<boolean> {
 
 async function runProcess(cmd: string, args: string[]): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const p = spawn(cmd, args, { env: { ...process.env, PYTHONIOENCODING: 'utf-8' } })
+    const p = spawn(cmd, args, { env: pyEnv() })
     p.stdout.on('data', () => {})
     p.stderr.on('data', () => {})
     p.on('error', reject)
@@ -336,7 +404,7 @@ async function runProcess(cmd: string, args: string[]): Promise<void> {
 
 function execCapture(cmd: string, args: string[]): Promise<{ stdout: string }> {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args)
+    const p = spawn(cmd, args, { env: pyEnv() })
     let out = ''
     p.stdout.on('data', (d: Buffer) => (out += d.toString()))
     p.on('error', reject)
