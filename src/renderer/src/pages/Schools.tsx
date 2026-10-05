@@ -141,7 +141,7 @@ export default function Schools(): React.JSX.Element {
           <h2 className="card-title">{editing ? `✏️ 编辑：${editing.name}` : '➕ 新增学校'}</h2>
           <div className="form-row">
             <label>学校名称</label>
-            <input value={name} placeholder="如：浙江大学 · 计算机学院" onChange={(e) => setName(e.target.value)} />
+            <input value={name} placeholder="如：XX大学 · 计算机学院" onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="form-row">
             <label>报考类型</label>

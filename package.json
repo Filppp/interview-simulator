@@ -32,5 +32,10 @@
     "react-dom": "^19.2.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.6"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_GITHUB_USERNAME/interview-simulator.git"
+  },
+  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/interview-simulator#readme"
 }
