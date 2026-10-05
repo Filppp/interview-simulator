@@ -100,7 +100,7 @@ docs/
 
 ## 📄 开源协议
 
-[MIT](LICENSE) © 2026 YOUR_GITHUB_USERNAME
+[MIT](LICENSE) © 2026 Filppp
 
 ---
 

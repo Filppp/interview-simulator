@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "研究生复试 / 保研面试模拟器",
   "main": "./out/main/index.js",
-  "author": "YOUR_GITHUB_USERNAME",
+  "author": "Filppp",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -35,7 +35,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/interview-simulator.git"
+    "url": "https://github.com/Filppp/interview-simulator.git"
   },
-  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/interview-simulator#readme"
+  "homepage": "https://github.com/Filppp/interview-simulator#readme"
 }
